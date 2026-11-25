@@ -94,5 +94,25 @@ app.post('/api/game/claim-bingo', (req, res) => {
   }
   res.json({ won: true, winner: g.winner });
 });
+app.post('/webhook', async (req, res) => {
+  const msg = req.body.message;
+  if (msg && msg.text === '/start') {
+    const tgUrl = 'https://' + 'api.telegram.org/bot' + process.env.BOT_TOKEN + '/sendMessage';
+    const appUrl = 'https://' + 'bingobot-0vk4' + '.onrender.com';
+
+    await fetch(tgUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: msg.chat.id,
+        text: '🎲 እንኳን ወደ Edil Bingos በደህና መጡ!\n\nጨዋታውን ለመጀመር ከታች ያለውን ቁልፍ ይንኩ፦',
+        reply_markup: {
+          inline_keyboard: [[{ text: '🎮 ቢንጎ ይጫወቱ (Play Bingo)', web_app: { url: appUrl } }]]
+        }
+      })
+    });
+  }
+  res.sendStatus(200);
+});
 
 app.listen(PORT, () => console.log('Running'));
