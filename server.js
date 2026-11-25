@@ -93,4 +93,4 @@ app.post('/api/game/claim-bingo', (req, res) => {
   res.json({ won: true, winner: g.winner });
 });
 
-app.listen(PORT, () => console.log('Running
+app.listen(PORT, () => console.log('Running'));
