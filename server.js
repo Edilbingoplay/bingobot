@@ -96,23 +96,37 @@ app.post('/api/game/claim-bingo', (req, res) => {
 });
 app.post('/webhook', async (req, res) => {
   const msg = req.body.message;
-  if (msg && msg.text === '/start') {
-    const tgUrl = 'https://' + 'api.telegram.org/bot' + process.env.BOT_TOKEN + '/sendMessage';
+  if (msg && msg.text) {
+    const chatId = msg.chat.id;
+    const text = msg.text;
+    const tgUrl = 'https://' + 'api.telegram.org' + '/bot' + process.env.BOT_TOKEN + '/sendMessage';
     const appUrl = 'https://' + 'bingobot-0vk4' + '.onrender.com';
+    const w = getWallet(chatId);
 
-    await fetch(tgUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: msg.chat.id,
-        text: '🎲 እንኳን ወደ Edil Bingos በደህና መጡ!\n\nጨዋታውን ለመጀመር ከታች ያለውን ቁልፍ ይንኩ፦',
-        reply_markup: {
-          inline_keyboard: [[{ text: '🎮 ቢንጎ ይጫወቱ (Play Bingo)', web_app: { url: appUrl } }]]
-        }
-      })
-    });
+    let replyText = '';
+    let markup = undefined;
+
+    if (text === '/start' || text === '/play') {
+      replyText = '🎲 እንኳን ወደ Edil Bingos በደህና መጡ!\n\nጨዋታውን ለመጀመር ከታች ያለውን ቁልፍ ይንኩ፦';
+      markup = { inline_keyboard: [[{ text: '🎮 ቢንጎ ይጫወቱ (Play Bingo)', web_app: { url: appUrl } }]] };
+    } else if (text === '/balance') {
+      replyText = `💰 የእርስዎ ቀሪ ሒሳብ (Balance): ${w.balance} ብር ነው።`;
+    } else if (text === '/deposit') {
+      replyText = '💳 ገንዘብ ለማስገባት (Deposit) የሚፈልጉትን የብር መጠን ይላኩ ወይም አድሚኑን ያናግሩ።';
+    } else if (text === '/withdrawal') {
+      replyText = `💸 ገንዘብ ወጪ ለማድረግ (Withdrawal) ቀሪ ሒሳብዎ ${w.balance} ብር ነው። የሚያወጡትን መጠን ይላኩ።`;
+    }
+
+    if (replyText) {
+      await fetch(tgUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: replyText, reply_markup: markup })
+      });
+    }
   }
   res.sendStatus(200);
 });
+
 
 app.listen(PORT, () => console.log('Running'));
