@@ -3,6 +3,8 @@ const cors = require('cors');
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.static(__dirname));
+
 const PORT = process.env.PORT || 3000;
 const wallets = new Map();
 const games = new Map();
@@ -34,7 +36,7 @@ function hasWin(card, called) {
   return [0,1,2,3,4].every(i => ok(i, i)) || [0,1,2,3,4].every(i => ok(i, 4 - i));
 }
 
-app.get('/', (req, res) => res.json({ status: 'ok', service: 'bingobot-backend' }));
+
 app.get('/api/wallet/:userId', (req, res) => res.json(getWallet(req.params.userId)));
 
 app.post('/api/wallet/deposit', (req, res) => {
