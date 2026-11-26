@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const mongoose = require('mongoose');
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -8,17 +10,29 @@ app.use(express.static(__dirname));
 const PORT = process.env.PORT || 3000;
 const ADMIN_ID = 8334791462;
 const TELEBIRR_NUMBER = '0984960995';
-const APP_URL = 'https://' + 'bingobot-0vk4' + '.onrender.com';
+const APP_URL = 'https://onrender.com';
 
-const wallets = new Map();
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('✅ MongoDB Connected Successfully!'))
+  .catch(err => console.error('❌ MongoDB Connection Error:', err));
+
+const walletSchema = new mongoose.Schema({
+  userId: { type: String, required: true, unique: true },
+  balance: { type: Number, default: 0 }
+});
+const Wallet = mongoose.model('Wallet', walletSchema);
+
 const userStates = new Map();
 const pendingDeposits = new Set();
 const pendingWithdrawAmount = new Map();
 
-function getWallet(id) {
+async function getWallet(id) {
   const k = String(id);
-  if (!wallets.has(k)) wallets.set(k, { userId: k, balance: 0 });
-  return wallets.get(k);
+  let w = await Wallet.findOne({ userId: k });
+  if (!w) {
+    w = await Wallet.create({ userId: k, balance: 0 });
+  }
+  return w;
 }
 
 const room = {
@@ -26,26 +40,25 @@ const room = {
   timer: 25,
   stake: 5,
   pot: 0,
-  calledNumbers: Array.of(),
-  pool: Array.of(),
+  calledNumbers: [],
+  pool: [],
   lockedCartelas: new Map(),
-    winner: null, winners: Array.of(),
-
-
+  winner: null,
+  winners: [],
 };
 
 function resetRoomToLobby() {
   room.phase = 'LOBBY';
   room.timer = 25;
   room.pot = 0;
-  room.calledNumbers = Array.of();
-  room.pool = Array.of();
+  room.calledNumbers = [];
+  room.pool = [];
   room.lockedCartelas.clear();
-  room.winner = null;  room.winners = Array.of();
-
+  room.winner = null;
+  room.winners = [];
 }
 
-function startCentralGame() {
+async function startCentralGame() {
   if (room.lockedCartelas.size === 0) {
     room.timer = 25;
     return;
@@ -59,9 +72,10 @@ function startCentralGame() {
 
   for (const [uid, count] of userCounts.entries()) {
     const cost = count * room.stake;
-    const w = getWallet(uid);
+    const w = await getWallet(uid);
     if (w.balance >= cost) {
       w.balance -= cost;
+      await w.save();
       validPot += cost;
     } else {
       for (const [cid, info] of room.lockedCartelas.entries()) {
@@ -77,18 +91,18 @@ function startCentralGame() {
 
   room.phase = 'PLAYING';
   room.pot = Math.floor(validPot * 0.8);
-  room.calledNumbers = Array.of();
+  room.calledNumbers = [];
   room.winner = null;
   room.pool = Array.from({ length: 75 }, (_, i) => i + 1).sort(() => Math.random() - 0.5);
 }
 
 let tickCount = 0;
-setInterval(() => {
+setInterval(async () => {
   tickCount++;
   if (room.phase === 'LOBBY') {
     if (room.lockedCartelas.size > 0) {
       room.timer--;
-      if (room.timer <= 0) startCentralGame();
+      if (room.timer <= 0) await startCentralGame();
     } else {
       room.timer = 25;
     }
@@ -107,11 +121,11 @@ setInterval(() => {
   }
 }, 1000);
 
-app.get('/api/game/state/:userId', (req, res) => {
+app.get('/api/game/state/:userId', async (req, res) => {
   const uid = String(req.params.userId || '');
-  const w = getWallet(uid);
+  const w = await getWallet(uid);
   const taken = Array.from(room.lockedCartelas.keys());
-  const myCartelas = Array.of();
+  const myCartelas = [];
   for (const [cid, info] of room.lockedCartelas.entries()) {
     if (info.userId === uid) myCartelas.push(cid);
   }
@@ -138,7 +152,7 @@ app.post('/api/game/stake', (req, res) => {
   res.json({ stake: room.stake });
 });
 
-app.post('/api/cartelas/lock', (req, res) => {
+app.post('/api/cartelas/lock', async (req, res) => {
   if (room.phase !== 'LOBBY') return res.status(400).json({ error: 'ጨዋታው ተጀምሯል! ቀጣዩን ዙር ይጠብቁ።' });
   const cid = Number(req.body.cartelaId);
   const uid = String(req.body.userId || '');
@@ -155,7 +169,7 @@ app.post('/api/cartelas/lock', (req, res) => {
   }
   if (myCount >= 3) return res.status(400).json({ error: 'እስከ 3 ካርቴላ ብቻ ነው የሚፈቀደው!' });
 
-  const w = getWallet(uid);
+  const w = await getWallet(uid);
   if (w.balance < (myCount + 1) * room.stake) {
     return res.status(400).json({ error: 'በቂ ቀሪ ሒሳብ የለዎትም!' });
   }
@@ -174,7 +188,7 @@ app.post('/api/cartelas/release', (req, res) => {
   res.json({ released: true });
 });
 
-app.post('/api/game/win', (req, res) => {
+app.post('/api/game/win', async (req, res) => {
   if (room.phase !== 'PLAYING' || room.winner) {
     return res.json({ accepted: false, winner: room.winner });
   }
@@ -184,8 +198,9 @@ app.post('/api/game/win', (req, res) => {
   const cardCols = req.body.cardCols;
   const winIndices = req.body.winIndices;
 
-  const w = getWallet(uid);
+  const w = await getWallet(uid);
   w.balance += room.pot;
+  await w.save();
 
   room.winner = {
     userId: uid,
@@ -202,7 +217,7 @@ app.post('/api/game/win', (req, res) => {
 });
 
 async function sendTgMessage(chatId, text, replyMarkup = undefined) {
-  const tgUrl = 'https://' + 'api.telegram.org' + '/bot' + process.env.BOT_TOKEN + '/sendMessage';
+  const tgUrl = 'https://telegram.org' + process.env.BOT_TOKEN + '/sendMessage';
   await fetch(tgUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -216,16 +231,16 @@ async function sendTgMessage(chatId, text, replyMarkup = undefined) {
 }
 
 const mainKeyboard = {
-  keyboard: Array.of(
-    Array.of({ text: '🎮 ጨዋታ ጀምር (Play Bingo)' }),
-    Array.of({ text: '💰 ቀሪ ሒሳብ' }, { text: '💳 ገንዘብ አስገባ' }),
-    Array.of({ text: '💸 ገንዘብ አውጣ' })
-  ),
+  keyboard: [
+    [{ text: '🎮 ጨዋታ ጀምር (Play Bingo)' }],
+    [{ text: '💰 ቀሪ ሒሳብ' }, { text: '💳 ገንዘብ አስገባ' }],
+    [{ text: '💸 ገንዘብ አውጣ' }]
+  ],
   resize_keyboard: true
 };
 
 const cancelKeyboard = {
-  keyboard: Array.of(Array.of({ text: '❌ ሰርዝ (Cancel)' })),
+  keyboard: [[{ text: '❌ ሰርዝ (Cancel)' }]],
   resize_keyboard: true
 };
 
@@ -237,7 +252,7 @@ app.post('/webhook', async (req, res) => {
   const uidStr = String(chatId);
   const userName = msg.from?.first_name || 'ተጫዋች';
   const text = (msg.text || '').trim();
-  const w = getWallet(chatId);
+  const w = await getWallet(chatId);
   const state = userStates.get(uidStr);
 
   if (text === '❌ ሰርዝ (Cancel)') {
@@ -249,11 +264,12 @@ app.post('/webhook', async (req, res) => {
 
   if (text.startsWith('/add ') && chatId === ADMIN_ID) {
     const parts = text.split(' ');
-    const targetId = String(parts.at(1) || '');
-    const amt = Number(parts.at(2));
+    const targetId = String(parts[1] || '');
+    const amt = Number(parts[2]);
     if (targetId && Number.isFinite(amt) && amt >= 50 && amt <= 500) {
-      const targetWallet = getWallet(targetId);
+      const targetWallet = await getWallet(targetId);
       targetWallet.balance += amt;
+      await targetWallet.save();
       pendingDeposits.delete(targetId);
       await sendTgMessage(ADMIN_ID, `✅ ለተጫዋች \`${targetId}\` *${amt} ብር* ተጨምሯል። አዲስ ሒሳብ: *${targetWallet.balance} ብር*`);
       await sendTgMessage(targetId, `🎉 *${amt} ብር* ወደ ዋሌትዎ ገብቷል!\n💰 አሁን ያለዎት ቀሪ ሒሳብ: *${targetWallet.balance} ብር*`, mainKeyboard);
@@ -267,9 +283,9 @@ app.post('/webhook', async (req, res) => {
     userStates.delete(uidStr);
     pendingWithdrawAmount.delete(uidStr);
     const playMarkup = {
-      inline_keyboard: Array.of(
-        Array.of({ text: '🎮 ቢንጎ ይጫወቱ (Play Bingo)', web_app: { url: APP_URL + '?uid=' + chatId } })
-      )
+      inline_keyboard: [
+        [{ text: '🎮 ቢንጎ ይጫወቱ (Play Bingo)', web_app: { url: APP_URL + '?uid=' + chatId } }]
+      ]
     };
     await sendTgMessage(
       chatId,
@@ -294,11 +310,11 @@ app.post('/webhook', async (req, res) => {
 
     userStates.set(uidStr, 'WAITING_DEPOSIT');
     const depositMarkup = {
-      keyboard: Array.of(
-        Array.of({ text: '50 ብር' }, { text: '100 ብር' }),
-        Array.of({ text: '200 ብር' }, { text: '500 ብር' }),
-        Array.of({ text: '❌ ሰርዝ (Cancel)' })
-      ),
+      keyboard: [
+        [{ text: '50 ብር' }, { text: '100 ብር' }],
+        [{ text: '200 ብር' }, { text: '500 ብር' }],
+        [{ text: '❌ ሰርዝ (Cancel)' }]
+      ],
       resize_keyboard: true
     };
     await sendTgMessage(
@@ -316,10 +332,10 @@ app.post('/webhook', async (req, res) => {
     } else {
       userStates.set(uidStr, 'WAITING_WITHDRAW');
       const withdrawMarkup = {
-        keyboard: Array.of(
-          Array.of({ text: '50 ብር' }, { text: `ሙሉውን (${w.balance} ብር)` }),
-          Array.of({ text: '❌ ሰርዝ (Cancel)' })
-        ),
+        keyboard: [
+          [{ text: '50 ብር' }, { text: `ሙሉውን (${w.balance} ብር)` }],
+          [{ text: '❌ ሰርዝ (Cancel)' }]
+        ],
         resize_keyboard: true
       };
       await sendTgMessage(
@@ -333,7 +349,7 @@ app.post('/webhook', async (req, res) => {
     }
   } else if (state === 'WAITING_DEPOSIT') {
     const numMatch = text.match(/\d+/);
-    const amt = numMatch ? Number(numMatch.at(0)) : 0;
+    const amt = numMatch ? Number(numMatch[0]) : 0;
     if (amt > 0 && (amt < 50 || amt > 500)) {
       await sendTgMessage(chatId, '⚠️ በአንድ ጊዜ ማስገባት የሚቻለው *ዝቅተኛ 50 ብር* እና *ከፍተኛ 500 ብር* ብቻ ነው! እባክዎ ትክክለኛ መጠን ይላኩ።');
       return res.sendStatus(200);
@@ -399,6 +415,7 @@ app.post('/webhook', async (req, res) => {
     }
 
     w.balance -= amt;
+    await w.save();
     pendingWithdrawAmount.delete(uidStr);
     userStates.delete(uidStr);
 
@@ -421,8 +438,3 @@ app.post('/webhook', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log('Running'));
-
-
-
-      
-    
