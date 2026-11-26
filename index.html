@@ -9,6 +9,8 @@
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
     html, body { background: #141824; color: #ffffff; height: 100%; overflow-x: hidden; user-select: none; }
     body { padding: 10px; }
+
+    body { padding: 10px; }
     .top-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
     .top-stats.four { grid-template-columns: repeat(4, 1fr); }
     .stat-box { background: #1f2436; border-radius: 10px; padding: 6px 4px; text-align: center; border: 1px solid #2c334a; }
@@ -35,6 +37,7 @@
     .stake-num { font-size: 15px; font-weight: bold; }
 
     .rule-badge { background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #fbbf24; text-align: center; font-size: 11px; font-weight: bold; padding: 5px; border-radius: 8px; margin: 6px 0; }
+    .wait-banner { display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #fca5a5; text-align: center; font-size: 12px; font-weight: bold; padding: 8px; border-radius: 8px; margin: 6px 0; }
     .banner-text { text-align: center; color: #22c55e; font-weight: bold; font-size: 13px; margin: 4px 0 2px; }
     .sub-title { text-align: center; font-size: 12px; margin-bottom: 8px; color: #9ca3af; }
 
@@ -70,7 +73,7 @@
 
     .auto-status-bar { width: 100%; margin-top: 4px; padding: 8px; border-radius: 8px; background: #1f2436; border: 1px solid #22c55e; color: #22c55e; font-size: 11px; font-weight: bold; text-align: center; }
 
-    .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+    .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; padding: 16px; z-index: 50; }
     .modal-card { background: #ffffff; color: #111827; border-radius: 16px; padding: 18px; width: 100%; max-width: 320px; text-align: center; }
     .modal-title { font-size: 20px; font-weight: bold; margin-bottom: 4px; }
     .modal-sub { font-size: 11px; color: #6b7280; margin-bottom: 10px; }
@@ -86,9 +89,9 @@
 
   <div id="lobbyScreen">
     <div class="top-stats">
-      <div class="stat-box"><div class="stat-label">ተጫዋቾች</div><div class="stat-val green" id="lobbyPlayers">1</div></div>
+      <div class="stat-box"><div class="stat-label">ተጫዋቾች</div><div class="stat-val green" id="lobbyPlayers">0</div></div>
       <div class="stat-box"><div class="stat-label">ሊጀምር ነው</div><div class="stat-val red" id="lobbyTimer">25s</div></div>
-      <div class="stat-box"><div class="stat-label">ቀሪ ሒሳብ</div><div class="stat-val gold" id="userBalance">0</div></div>
+      <div class="stat-box"><div class="stat-label">ቀሪ ሒሳብ</div><div class="stat-val gold" id="userBalance">0 ብር</div></div>
     </div>
 
     <div class="controls-row">
@@ -107,7 +110,8 @@
       </div>
     </div>
 
-    <div class="rule-badge">🏆 ሕግ: በ2 መስመር (አግድም፣ ቁልቁል፣ ዲያጎናል ወይም 4 ማዕዘን) አውቶማቲክ ይዘጋል!</div>
+    <div class="wait-banner" id="waitBanner">⏳ ጨዋታ እየተካሄደ ነው! ይህ ዙር ሲያልቅ እኩል ይጀምራሉ...</div>
+    <div class="rule-badge">🏆 ሕግ: ሁሉም እኩል ይጀምራሉ | በ2 መስመር (ወይም 4 ማዕዘን) አውቶማቲክ ይዘጋል!</div>
     <div class="banner-text" id="selectedInfo">የመረጡት ካርቴላ: 0 / 3</div>
     <div class="sub-title">የካርቴላ ቁጥር ይምረጡ (ቀይ የተያዙ ናቸው)</div>
     <div class="cartela-grid" id="cartelaGrid"></div>
@@ -116,8 +120,8 @@
   <div id="gameScreen">
     <div class="top-stats four">
       <div class="stat-box"><div class="stat-label">ተጫዋቾች</div><div class="stat-val green" id="gamePlayers">1</div></div>
-      <div class="stat-box"><div class="stat-label">መደብ</div><div class="stat-val" id="gameStake">5</div></div>
-      <div class="stat-box"><div class="stat-label">ደራሽ</div><div class="stat-val gold" id="gamePot">0</div></div>
+      <div class="stat-box"><div class="stat-label">መደብ</div><div class="stat-val" id="gameStake">5 ብር</div></div>
+      <div class="stat-box"><div class="stat-label">ደራሽ</div><div class="stat-val gold" id="gamePot">0 ብር</div></div>
       <div class="stat-box"><div class="stat-label">የተጠራ</div><div class="stat-val pink" id="calledCount">0</div></div>
     </div>
 
@@ -140,24 +144,28 @@
   <div class="modal-bg" id="winnerModal">
     <div class="modal-card">
       <div class="modal-title">🎉 ቢንጎ ተዘግቷል!</div>
-      <div class="modal-sub">አዲስ ዙር ሊጀመር ነው፤ ወደ መምረጫ ገጽ እየተመለሱ ነው።</div>
+      <div class="modal-sub">ጨዋታው ለሁሉም ቆሟል፤ አዲስ ዙር እኩል ሊጀመር ነው።</div>
       <div class="winner-name" id="winnerText"></div>
       <div class="win-grid" id="winnerCardGrid"></div>
-      <div class="redirect-txt" id="redirectCountdown">በ 5 ሰከንድ ውስጥ ይመለሳሉ...</div>
+      <div class="redirect-txt" id="redirectCountdown">በ 6 ሰከንድ ውስጥ ወደ መምረጫ ይመለሳሉ...</div>
     </div>
   </div>
+
   <script>
     const tg = window.Telegram && window.Telegram.WebApp;
     if (tg) { tg.expand(); if (tg.disableVerticalSwipes) tg.disableVerticalSwipes(); }
 
     const urlParams = new URLSearchParams(window.location.search);
-    const userId = urlParams.get('uid') || (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) || 'guest';
+    const userId = String(urlParams.get('uid') || (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) || 'guest');
+    const userName = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.first_name) || 'ተጫዋች';
 
-    let balance = 0, stake = 5, autoMark = true, gameEnded = false;
+    let balance = 0, stake = 5, autoMark = true;
     let selectedCartelas = Array.of();
-    let lobbySeconds = 25, lobbyInterval, callInterval, calledNumbers = Array.of();
-    let myCards = Array.of();
     let takenCartelas = new Set();
+    let myCards = Array.of();
+    let activeGameStarted = false;
+    let winClaimSent = false;
+    let winnerShown = false;
 
     const WIN_PATTERNS = Array.of(
       Array.of(0, 1, 2, 3, 4),
@@ -175,123 +183,18 @@
       Array.of(0, 4, 20, 24)
     );
 
-    async function syncServerState() {
-      try {
-        const wRes = await fetch('/api/wallet/' + userId);
-        if (wRes.ok) {
-          const wData = await wRes.json();
-          balance = wData.balance;
-          document.getElementById('userBalance').innerText = balance + ' ብር';
-        }
-        const tRes = await fetch('/api/cartelas/taken');
-        if (tRes.ok) {
-          const tData = await tRes.json();
-          takenCartelas = new Set(tData.taken || Array.of());
-          document.getElementById('lobbyPlayers').innerText = Math.max(1, tData.playersCount || 1);
-          renderCartelaBalls();
-        }
-      } catch (e) { console.error(e); }
-    }
-
-    function updateSelectedLabel() {
-      document.getElementById('selectedInfo').innerText = 'የመረጡት ካርቴላ: ' + selectedCartelas.length + ' / 3';
-    }
-
-    function renderCartelaBalls() {
-      const grid = document.getElementById('cartelaGrid');
-      grid.innerHTML = '';
-      for (let i = 1; i <= 500; i++) {
-        const div = document.createElement('div');
-        const isTaken = takenCartelas.has(i) && !selectedCartelas.includes(i);
-        div.className = 'c-ball' + (isTaken ? ' taken' : '') + (selectedCartelas.includes(i) ? ' selected' : '');
-        div.innerText = i;
-        div.onclick = async () => {
-          if (selectedCartelas.includes(i)) {
-            selectedCartelas = selectedCartelas.filter(x => x !== i);
-            div.classList.remove('selected');
-            updateSelectedLabel();
-            await fetch('/api/cartelas/release', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId: userId, cartelaId: i })
-            }).catch(() => {});
-          } else {
-            if (selectedCartelas.length >= 3) {
-              alert('በአንድ ጊዜ መምረጥ የሚችሉት እስከ 3 ካርቴላ ብቻ ነው!');
-              return;
-            }
-            if (balance < (selectedCartelas.length + 1) * stake) {
-              alert('በቂ ቀሪ ሒሳብ የለዎትም! እባክዎ መጀመሪያ ገንዘብ ያስገቡ (Deposit)።');
-              return;
-            }
-            try {
-              const lockRes = await fetch('/api/cartelas/lock', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: userId, cartelaId: i })
-              });
-              if (!lockRes.ok) {
-                alert('ይህ ካርቴላ አሁን በሌላ ተጫዋች ተይዟል! እባክዎ ሌላ ይምረጡ።');
-                takenCartelas.add(i);
-                div.classList.add('taken');
-                return;
-              }
-            } catch (e) {}
-
-            selectedCartelas.push(i);
-            div.classList.add('selected');
-            updateSelectedLabel();
-          }
-        };
-        grid.appendChild(div);
-      }
-    }
-
-    async function initLobby() {
-      gameEnded = false;
-      selectedCartelas = Array.of();
-      updateSelectedLabel();
-      await syncServerState();
-      renderCartelaBalls();
-      startLobbyTimer();
-    }
-
-    function toggleAuto() {
-      autoMark = !autoMark;
-      document.getElementById('autoSwitch').classList.toggle('on', autoMark);
-    }
-
-    function changeStake(delta) {
-      stake = Math.min(10, Math.max(5, stake + delta));
-      document.getElementById('stakeVal').innerText = stake + ' ብር';
-    }
-
-    function startLobbyTimer() {
-      clearInterval(lobbyInterval);
-      lobbySeconds = 25;
-      document.getElementById('lobbyTimer').innerText = lobbySeconds + 's';
-      lobbyInterval = setInterval(async () => {
-        lobbySeconds--;
-        document.getElementById('lobbyTimer').innerText = lobbySeconds + 's';
-        if (lobbySeconds % 5 === 0) await syncServerState();
-        if (lobbySeconds <= 0) {
-          clearInterval(lobbyInterval);
-          if (selectedCartelas.length === 0) {
-            startLobbyTimer();
-          } else {
-            startGame();
-          }
-        }
-      }, 1000);
-    }
-
-    function generateCard() {
+    function generateDeterministicCard(cartelaId) {
+      let seed = cartelaId * 9301 + 49297;
+      const rand = () => {
+        seed = (seed * 1664525 + 1013904223) % 4294967296;
+        return seed / 4294967296;
+      };
       const cols = Array.of();
       for (let c = 0; c < 5; c++) {
         const min = c * 15 + 1;
         const nums = Array.of();
         while (nums.length < 5) {
-          const n = Math.floor(Math.random() * 15) + min;
+          const n = Math.floor(rand() * 15) + min;
           if (!nums.includes(n)) nums.push(n);
         }
         cols.push(nums);
@@ -300,36 +203,84 @@
       return cols;
     }
 
-    async function startGame() {
-      const totalCost = stake * selectedCartelas.length;
-      if (balance < totalCost) {
-        alert('በቂ ቀሪ ሒሳብ የለዎትም!');
-        initLobby();
-        return;
+    function buildCartelaGrid() {
+      const grid = document.getElementById('cartelaGrid');
+      grid.innerHTML = '';
+      for (let i = 1; i <= 500; i++) {
+        const div = document.createElement('div');
+        div.className = 'c-ball';
+        div.id = 'cball-' + i;
+        div.innerText = i;
+        div.onclick = async () => {
+          if (selectedCartelas.includes(i)) {
+            const res = await fetch('/api/cartelas/release', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: userId, cartelaId: i })
+            }).catch(() => null);
+            if (res && res.ok) {
+              selectedCartelas = selectedCartelas.filter(x => x !== i);
+              updateBallStyles();
+            }
+          } else {
+            if (selectedCartelas.length >= 3) {
+              alert('በአንድ ጊዜ መምረጥ የሚችሉት እስከ 3 ካርቴላ ብቻ ነው!');
+              return;
+            }
+            const res = await fetch('/api/cartelas/lock', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: userId, userName: userName, cartelaId: i })
+            }).catch(() => null);
+            if (res && res.ok) {
+              selectedCartelas.push(i);
+              updateBallStyles();
+            } else if (res) {
+              const errData = await res.json().catch(() => ({}));
+              alert(errData.error || 'ካርቴላውን መያዝ አልተቻለም!');
+            }
+          }
+        };
+        grid.appendChild(div);
       }
+    }
 
-      gameEnded = false;
-      balance -= totalCost;
-      document.getElementById('userBalance').innerText = balance + ' ብር';
+    function updateBallStyles() {
+      document.getElementById('selectedInfo').innerText = 'የመረጡት ካርቴላ: ' + selectedCartelas.length + ' / 3';
+      for (let i = 1; i <= 500; i++) {
+        const el = document.getElementById('cball-' + i);
+        if (!el) continue;
+        const isMine = selectedCartelas.includes(i);
+        const isTaken = takenCartelas.has(i) && !isMine;
+        el.className = 'c-ball' + (isTaken ? ' taken' : '') + (isMine ? ' selected' : '');
+      }
+    }
 
-      await fetch('/api/wallet/deposit', {
+    function toggleAuto() {
+      autoMark = !autoMark;
+      document.getElementById('autoSwitch').classList.toggle('on', autoMark);
+    }
+
+    async function changeStake(delta) {
+      const nextStake = Math.min(10, Math.max(5, stake + delta));
+      await fetch('/api/game/stake', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: userId, amount: -totalCost })
+        body: JSON.stringify({ stake: nextStake })
       }).catch(() => {});
+    }
 
-      const playersCount = Math.max(1, Number(document.getElementById('lobbyPlayers').innerText));
-      const realPot = Math.floor(playersCount * totalCost * 0.8);
+    function setupGameBoard(state) {
+      activeGameStarted = true;
+      winClaimSent = false;
+      winnerShown = false;
 
+      document.getElementById('winnerModal').style.display = 'none';
       document.getElementById('lobbyScreen').style.display = 'none';
       document.getElementById('gameScreen').style.display = 'block';
-      document.getElementById('gamePlayers').innerText = playersCount;
-      document.getElementById('gameStake').innerText = stake + ' ብር';
-      document.getElementById('gamePot').innerText = realPot + ' ብር';
-
-      calledNumbers = Array.of();
-      document.getElementById('calledCount').innerText = '0';
-      document.getElementById('currentCall').innerText = '--';
+      document.getElementById('gamePlayers').innerText = state.playersCount;
+      document.getElementById('gameStake').innerText = state.stake + ' ብር';
+      document.getElementById('gamePot').innerText = state.pot + ' ብር';
 
       const b75 = document.getElementById('board75');
       b75.innerHTML = '';
@@ -344,7 +295,7 @@
         }
       }
 
-      myCards = selectedCartelas.map(id => ({ id: id, cols: generateCard() }));
+      myCards = selectedCartelas.map(id => ({ id: id, cols: generateDeterministicCard(id) }));
       const pGrid = document.getElementById('playerCardGrid');
       pGrid.innerHTML = '';
       pGrid.className = 'cards-container' + (myCards.length === 1 ? ' single' : '');
@@ -375,7 +326,7 @@
             cell.dataset.num = val;
             cell.innerText = val;
             cell.onclick = () => {
-              if (val !== '*' && !gameEnded) {
+              if (val !== '*' && activeGameStarted) {
                 cell.classList.toggle('marked');
                 evaluateAutoBingo();
               }
@@ -386,35 +337,38 @@
         cardWrap.appendChild(subGrid);
         pGrid.appendChild(cardWrap);
       });
+    }
 
-      const pool = Array.from({length: 75}, (_, i) => i + 1).sort(() => Math.random() - 0.5);
-      callInterval = setInterval(() => {
-        if (pool.length === 0 || gameEnded) return;
-        const num = pool.pop();
-        calledNumbers.push(num);
-        const letter = num <= 15 ? 'B' : num <= 30 ? 'I' : num <= 45 ? 'N' : num <= 60 ? 'G' : 'O';
-        document.getElementById('currentCall').innerText = letter + num;
-        document.getElementById('calledCount').innerText = calledNumbers.length;
+    function updateCalledNumbersOnUI(calledList) {
+      document.getElementById('calledCount').innerText = calledList.length;
+      if (calledList.length > 0) {
+        const last = calledList.at(calledList.length - 1);
+        const letter = last <= 15 ? 'B' : last <= 30 ? 'I' : last <= 45 ? 'N' : last <= 60 ? 'G' : 'O';
+        document.getElementById('currentCall').innerText = letter + last;
+      } else {
+        document.getElementById('currentCall').innerText = '--';
+      }
+
+      calledList.forEach(num => {
         const bEl = document.getElementById('b75-' + num);
         if (bEl) bEl.classList.add('called');
-
         if (autoMark) {
           document.querySelectorAll('.p-cell').forEach(el => {
             if (Number(el.dataset.num) === num) el.classList.add('marked');
           });
         }
-        evaluateAutoBingo();
-      }, 2200);
+      });
+
+      evaluateAutoBingo();
     }
 
     async function evaluateAutoBingo() {
-      if (gameEnded) return;
+      if (!activeGameStarted || winClaimSent) return;
       const cardGrids = Array.from(document.querySelectorAll('.single-card-grid'));
 
       for (let i = 0; i < cardGrids.length; i++) {
-                const cells = Array.from(cardGrids.at(i).querySelectorAll('.p-cell'));
-
-            cells.forEach(c => c.classList.remove('one-to-go'));
+        const cells = Array.from(cardGrids.at(i).querySelectorAll('.p-cell'));
+        cells.forEach(c => c.classList.remove('one-to-go'));
         const marked = cells.map(c => c.classList.contains('marked') || c.classList.contains('free'));
 
         const completedPatterns = Array.of();
@@ -431,74 +385,112 @@
         if (progEl) progEl.innerText = Math.min(2, completedPatterns.length) + '/2 ዝግ';
 
         if (completedPatterns.length >= 2) {
-          gameEnded = true;
-          clearInterval(callInterval);
+          winClaimSent = true;
           if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-
           const allWinningIndices = Array.from(new Set(completedPatterns.flat()));
-          await handleAutoWin(myCards.at(i), allWinningIndices);
+          const wonCard = myCards.at(i);
+
+          await fetch('/api/game/win', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: userId,
+              userName: userName,
+              cartelaId: wonCard.id,
+              cardCols: wonCard.cols,
+              winIndices: allWinningIndices
+            })
+          }).catch(() => {});
           return;
         }
       }
     }
 
-    async function handleAutoWin(wonCard, winIndices) {
-      const pot = parseInt(document.getElementById('gamePot').innerText) || 0;
-      balance += pot;
-      document.getElementById('userBalance').innerText = balance + ' ብር';
+    function showGlobalWinnerModal(winner, secondsLeft) {
+      activeGameStarted = false;
+      if (!winnerShown && winner) {
+        winnerShown = true;
+        document.getElementById('winnerText').innerText =
+          winner.userName + ' (ካርቴላ #' + winner.cartelaId + ') ' + winner.prize + ' ብር አሸንፈዋል!';
 
-      await fetch('/api/wallet/deposit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: userId, amount: pot })
-      }).catch(() => {});
-
-      await fetch('/api/cartelas/reset', { method: 'POST' }).catch(() => {});
-
-      const user = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.first_name) || 'እርስዎ';
-      finishGame(user + ' (ካርቴላ #' + wonCard.id + ')', wonCard.cols, winIndices);
+        const wGrid = document.getElementById('winnerCardGrid');
+        wGrid.innerHTML = '';
+        const letters = Array.of('B', 'I', 'N', 'G', 'O');
+        letters.forEach(l => {
+          const h = document.createElement('div'); h.className = 'w-head'; h.innerText = l; wGrid.appendChild(h);
+        });
+        if (winner.cardCols && winner.winIndices) {
+          for (let r = 0; r < 5; r++) {
+            for (let c = 0; c < 5; c++) {
+              const idx = r * 5 + c;
+              const cell = document.createElement('div');
+              cell.className = 'w-cell' + (winner.winIndices.includes(idx) ? ' win-line' : '');
+              cell.innerText = winner.cardCols.at(c).at(r);
+              wGrid.appendChild(cell);
+            }
+          }
+        }
+        document.getElementById('winnerModal').style.display = 'flex';
+      }
+      document.getElementById('redirectCountdown').innerText = 'በ ' + secondsLeft + ' ሰከንድ ውስጥ ወደ መምረጫ ይመለሳሉ...';
     }
 
-    function finishGame(winnerLabel, cardCols, winIndices) {
-      clearInterval(callInterval);
-      document.getElementById('winnerText').innerText = winnerLabel + ' በ2 ዝግ አሸንፈዋል!';
-      const wGrid = document.getElementById('winnerCardGrid');
-      wGrid.innerHTML = '';
-      const letters = Array.of('B', 'I', 'N', 'G', 'O');
-      letters.forEach(l => {
-        const h = document.createElement('div'); h.className = 'w-head'; h.innerText = l; wGrid.appendChild(h);
-      });
-      for (let r = 0; r < 5; r++) {
-        for (let c = 0; c < 5; c++) {
-          const idx = r * 5 + c;
-          const cell = document.createElement('div');
-          cell.className = 'w-cell' + (winIndices.includes(idx) ? ' win-line' : '');
-          cell.innerText = cardCols.at(c).at(r);
-          wGrid.appendChild(cell);
-        }
-      }
-      document.getElementById('winnerModal').style.display = 'flex';
-      let sec = 5;
-      document.getElementById('redirectCountdown').innerText = 'በ ' + sec + ' ሰከንድ ውስጥ ወደ መምረጫ ይመለሳሉ...';
-      const redir = setInterval(() => {
-        sec--;
-        document.getElementById('redirectCountdown').innerText = 'በ ' + sec + ' ሰከንድ ውስጥ ወደ መምረጫ ይመለሳሉ...';
-        if (sec <= 0) {
-          clearInterval(redir);
+    async function pollServer() {
+      try {
+        const res = await fetch('/api/game/state/' + userId);
+        if (!res.ok) return;
+        const state = await res.json();
+
+        balance = state.balance;
+        stake = state.stake;
+        document.getElementById('userBalance').innerText = balance + ' ብር';
+        document.getElementById('stakeVal').innerText = stake + ' ብር';
+
+        if (state.phase === 'LOBBY') {
+          activeGameStarted = false;
+          winnerShown = false;
+          winClaimSent = false;
           document.getElementById('winnerModal').style.display = 'none';
           document.getElementById('gameScreen').style.display = 'none';
           document.getElementById('lobbyScreen').style.display = 'block';
-          selectedCartelas = Array.of();
-          myCards = Array.of();
-          initLobby();
+          document.getElementById('waitBanner').style.display = 'none';
+
+          document.getElementById('lobbyPlayers').innerText = state.playersCount;
+          document.getElementById('lobbyTimer').innerText = state.timer + 's';
+
+          takenCartelas = new Set(state.taken || Array.of());
+          selectedCartelas = state.myCartelas || Array.of();
+          updateBallStyles();
+        } else if (state.phase === 'PLAYING') {
+          selectedCartelas = state.myCartelas || Array.of();
+          if (selectedCartelas.length > 0) {
+            if (!activeGameStarted) {
+              setupGameBoard(state);
+            }
+            document.getElementById('gamePlayers').innerText = state.playersCount;
+            document.getElementById('gamePot').innerText = state.pot + ' ብር';
+            updateCalledNumbersOnUI(state.calledNumbers || Array.of());
+          } else {
+            document.getElementById('winnerModal').style.display = 'none';
+            document.getElementById('gameScreen').style.display = 'none';
+            document.getElementById('lobbyScreen').style.display = 'block';
+            document.getElementById('waitBanner').style.display = 'block';
+            document.getElementById('lobbyPlayers').innerText = state.playersCount;
+            document.getElementById('lobbyTimer').innerText = 'በሂደት ላይ';
+            takenCartelas = new Set(state.taken || Array.of());
+            updateBallStyles();
+          }
+        } else if (state.phase === 'FINISHED') {
+          showGlobalWinnerModal(state.winner, state.timer);
         }
-      }, 1000);
+      } catch (e) { console.error(e); }
     }
 
-    initLobby();
+    buildCartelaGrid();
+    pollServer();
+    setInterval(pollServer, 1000);
   </script>
 </body>
 </html>
 
-
-  
+    
