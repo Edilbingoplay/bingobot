@@ -4,17 +4,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
-
 const PORT = process.env.PORT || 3000;
 const ADMIN_ID = 8334791462;
 const TELEBIRR_NUMBER = '0984960995';
 const APP_URL = 'https://' + 'bingobot-0vk4' + '.onrender.com';
-
 const wallets = new Map();
 const userStates = new Map();
 const lockedCartelas = new Map();
 const pendingDeposits = new Set();
-
+const pendingWithdrawAmount = new Map();
 function getWallet(id) {
   const k = String(id);
   if (!wallets.has(k)) wallets.set(k, { userId: k, balance: 0 });
@@ -213,7 +211,14 @@ app.post('/webhook', async (req, res) => {
   } else if (state === 'WAITING_WITHDRAW') {
     let amt = 0;
     if (text.startsWith('ሙሉውን')) {
-      amt = w.balance;
+          pendingWithdrawAmount.set(uidStr, amt);
+    userStates.set(uidStr, 'WAITING_WITHDRAW_PHONE');
+    await sendTgMessage(
+      chatId,
+      `📱 *${amt} ብር* የሚላክበትን **የቴሌብር ስልክ ቁጥርዎን** ይጻፉ (ለምሳሌ፦ \`0911223344\`)፦`,
+      cancelKeyboard
+    );
+
     } else {
       const cleaned = text.replace(/ብር/g, '').trim();
       if (!/^\d+$/.test(cleaned)) {
