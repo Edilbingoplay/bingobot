@@ -6,17 +6,49 @@ app.use(express.json());
 app.use(express.static(__dirname));
 
 const PORT = process.env.PORT || 3000;
+const ADMIN_ID = 8334791462;
+const APP_URL = 'https://onrender.com';
+
 const wallets = new Map();
 const games = new Map();
+const userStates = new Map();
 
 function getWallet(id) {
   const k = String(id);
-  if (!wallets.has(k)) wallets.set(k, { userId: k, balance: 100 });
+  if (!wallets.has(k)) wallets.set(k, { userId: k, balance: 0 });
   return wallets.get(k);
 }
 
+async function sendTgMessage(chatId, text, replyMarkup = undefined) {
+  const tgUrl = `https://telegram.org{process.env.BOT_TOKEN}/sendMessage`;
+  await fetch(tgUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: 'Markdown',
+      reply_markup: replyMarkup
+    })
+  }).catch(err => console.error('TG Error:', err));
+}
+
+const mainKeyboard = {
+  keyboard: [
+    [{ text: '🎮 ጨዋታ ጀምር (Play Bingo)' }],
+    [{ text: '💰 ቀሪ ሒሳብ' }, { text: '💳 ገንዘብ አስገባ' }],
+    [{ text: '💸 ገንዘብ አውጣ' }]
+  ],
+  resize_keyboard: true
+};
+
+const cancelKeyboard = {
+  keyboard: [[{ text: '❌ ሰርዝ (Cancel)' }]],
+  resize_keyboard: true
+};
+
 function makeCard() {
-  const ranges = [[1,15],[16,30],[31,45],[46,60],[61,75]];
+  const ranges = [[1, 15], [16, 30], [31, 45], [46, 60], [61, 75]];
   const card = ranges.map(([min, max]) => {
     const pool = [];
     for (let n = min; n <= max; n++) pool.push(n);
@@ -30,12 +62,11 @@ function makeCard() {
 function hasWin(card, called) {
   const ok = (r, c) => card[c][r] === 'FREE' || called.has(card[c][r]);
   for (let i = 0; i < 5; i++) {
-    if ([0,1,2,3,4].every(c => ok(i, c))) return true;
-    if ([0,1,2,3,4].every(r => ok(r, i))) return true;
+    if ([0, 1, 2, 3, 4].every(c => ok(i, c))) return true;
+    if ([0, 1, 2, 3, 4].every(r => ok(r, i))) return true;
   }
-  return [0,1,2,3,4].every(i => ok(i, i)) || [0,1,2,3,4].every(i => ok(i, 4 - i));
+  return [0, 1, 2, 3, 4].every(i => ok(i, i)) || [0, 1, 2, 3, 4].every(i => ok(i, 4 - i));
 }
-
 
 app.get('/api/wallet/:userId', (req, res) => res.json(getWallet(req.params.userId)));
 
@@ -79,54 +110,129 @@ app.post('/api/game/call', (req, res) => {
   res.json({ nextNumber, calledNumbers: g.calledNumbers });
 });
 
-app.post('/api/game/claim-bingo', (req, res) => {
+app.post('/api/game/claim-bingo', async (req, res) => {
   const g = games.get(String(req.body.gameId || 'default'));
   if (!g) return res.status(404).json({ error: 'Not found' });
   const p = g.players[String(req.body.userId)];
   if (!p) return res.status(400).json({ error: 'Not in game' });
   if (!hasWin(p.card, new Set(g.calledNumbers))) return res.status(400).json({ error: 'Invalid win' });
   if (!g.winner && g.pot > 0) {
+    const prize = g.pot;
     const w = getWallet(req.body.userId);
-    w.balance += g.pot;
-    g.winner = { userId: String(req.body.userId), prize: g.pot };
+    w.balance += prize;
+    g.winner = { userId: String(req.body.userId), prize };
     g.pot = 0;
     g.status = 'finished';
+
+    await sendTgMessage(
+      req.body.userId,
+      `🎉 *እንኳን ደስ አለዎት! ቢንጎ አሸንፈዋል!*\n\n🏆 ሽልማት: *${prize} ብር*\n💰 አዲስ ቀሪ ሒሳብ: *${w.balance} ብር*`,
+      mainKeyboard
+    );
   }
   res.json({ won: true, winner: g.winner });
 });
+
 app.post('/webhook', async (req, res) => {
   const msg = req.body.message;
-  if (msg && msg.text) {
-    const chatId = msg.chat.id;
-    const text = msg.text;
-    const tgUrl = 'https://' + 'api.telegram.org' + '/bot' + process.env.BOT_TOKEN + '/sendMessage';
-    const appUrl = 'https://' + 'bingobot-0vk4' + '.onrender.com';
-    const w = getWallet(chatId);
+  if (!msg) return res.sendStatus(200);
 
-    let replyText = '';
-    let markup = undefined;
+  const chatId = msg.chat.id;
+  const userName = msg.from?.first_name || 'ተጫዋች';
+  const text = (msg.text || '').trim();
+  const w = getWallet(chatId);
+  const state = userStates.get(String(chatId));
 
-    if (text === '/start' || text === '/play') {
-      replyText = '🎲 እንኳን ወደ Edil Bingos በደህና መጡ!\n\nጨዋታውን ለመጀመር ከታች ያለውን ቁልፍ ይንኩ፦';
-      markup = { inline_keyboard: [[{ text: '🎮 ቢንጎ ይጫወቱ (Play Bingo)', web_app: { url: appUrl } }]] };
-    } else if (text === '/balance') {
-      replyText = `💰 የእርስዎ ቀሪ ሒሳብ (Balance): ${w.balance} ብር ነው።`;
-    } else if (text === '/deposit') {
-      replyText = '💳 ገንዘብ ለማስገባት (Deposit) የሚፈልጉትን የብር መጠን ይላኩ ወይም አድሚኑን ያናግሩ።';
-    } else if (text === '/withdrawal') {
-      replyText = `💸 ገንዘብ ወጪ ለማድረግ (Withdrawal) ቀሪ ሒሳብዎ ${w.balance} ብር ነው። የሚያወጡትን መጠን ይላኩ።`;
+  if (text === '❌ ሰርዝ (Cancel)') {
+    userStates.delete(String(chatId));
+    await sendTgMessage(chatId, '✅ ሂደቱ ተሰርዟል። ወደ ዋናው ሜኑ ተመልሰዋል።', mainKeyboard);
+    return res.sendStatus(200);
+  }
+
+  if (text.startsWith('/add ') && chatId === ADMIN_ID) {
+    const parts = text.split(' ');
+    const targetId = parts[1];
+    const amt = Number(parts[2]);
+    if (targetId && Number.isFinite(amt) && amt > 0) {
+      const targetWallet = getWallet(targetId);
+      targetWallet.balance += amt;
+      await sendTgMessage(ADMIN_ID, `✅ ለተጫዋች \`${targetId}\` *${amt} ብር* ተጨምሯል። አዲስ ሒሳብ: *${targetWallet.balance} ብር*`);
+      await sendTgMessage(targetId, `🎉 *${amt} ብር* ወደ ሒሳብዎ ገብቷል!\n💰 አሁን ያለዎት ቀሪ ሒሳብ: *${targetWallet.balance} ብር*`, mainKeyboard);
+    } else {
+      await sendTgMessage(ADMIN_ID, '⚠️ አጠቃቀም: `/add USER_ID 100`');
     }
+    return res.sendStatus(200);
+  }
 
-    if (replyText) {
-      await fetch(tgUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text: replyText, reply_markup: markup })
-      });
+  if (text === '/start' || text === '/play' || text === '🎮 ጨዋታ ጀምር (Play Bingo)') {
+    userStates.delete(String(chatId));
+    await sendTgMessage(
+      chatId,
+      `🎲 እንኳን ወደ *Edil Bingos* በደህና መጡ፣ ${userName}!\n\n💰 ቀሪ ሒሳብዎ: *${w.balance} ብር*\n\nጨዋታውን ለመጀመር ከታች ያለውን ቁልፍ ይንኩ፦`,
+      { inline_keyboard: [[{ text: '🎮 ቢንጎ ይጫወቱ (Play Bingo)', web_app: { url: `${APP_URL}?uid=${chatId}` } }]] }
+    );
+    if (text === '/start') {
+      await sendTgMessage(chatId, 'ከታች ያሉትን አማራጮች መጠቀም ይችላሉ 👇', mainKeyboard);
+    }
+  } else if (text === '/balance' || text === '💰 ቀሪ ሒሳብ') {
+    userStates.delete(String(chatId));
+    await sendTgMessage(chatId, `💰 የእርስዎ ቀሪ ሒሳብ (Balance): *${w.balance} ብር* ነው።`, mainKeyboard);
+  } else if (text === '/deposit' || text === '💳 ገንዘብ አስገባ') {
+    userStates.set(String(chatId), 'WAITING_DEPOSIT');
+    await sendTgMessage(
+      chatId,
+      `💳 *ገንዘብ ለማስገባት (Deposit)*\n\n` +
+      `1️⃣ በቴሌብር (Telebirr): \`0911XXXXXX\`\n` +
+      `2️⃣ በCBE: \`1000XXXXXXXXX\`\n\n` +
+      `ገንዘቡን ካስገቡ በኋላ *የላኩትን የብር መጠን እና Transaction ID* (ወይም የደረሰኝ ፎቶ) እዚህ ይላኩ፦`,
+      cancelKeyboard
+    );
+  } else if (text === '/withdrawal' || text === '💸 ገንዘብ አውጣ') {
+    if (w.balance < 50) {
+      await sendTgMessage(chatId, `⚠️ ገንዘብ ለማውጣት ቢያንስ *50 ብር* ሊኖርዎት ይገባል። የአሁን ሒሳብዎ: *${w.balance} ብር*`, mainKeyboard);
+    } else {
+      userStates.set(String(chatId), 'WAITING_WITHDRAW');
+      await sendTgMessage(
+        chatId,
+        `💸 *ገንዘብ ወጪ ማድረጊያ (Withdrawal)*\nቀሪ ሒሳብዎ: *${w.balance} ብር*\n\nየሚያወጡትን መጠን ይምረጡ ወይም በቁጥር ይጻፉ፦`,
+        {
+          keyboard: [
+            [{ text: '50 ብር' }, { text: '100 ብር' }],
+            [{ text: '200 ብር' }, { text: '500 ብር' }],
+            [{ text: '❌ ሰርዝ (Cancel)' }]
+          ],
+          resize_keyboard: true
+        }
+      );
+    }
+  } else if (state === 'WAITING_DEPOSIT') {
+    const info = text || '[የደረሰኝ ፎቶ ተልኳል]';
+    await sendTgMessage(
+      ADMIN_ID,
+      `🔔 *አዲስ የገንዘብ ማስገባት ጥያቄ!*\n👤 ተጫዋች: ${userName} (ID: \`${chatId}\`)\n📝 መልእክት: ${info}\n\nሒሳቡን ለመሙላት ይህን ይላኩ፡\n\`/add ${chatId} 100\``
+    );
+    userStates.delete(String(chatId));
+    await sendTgMessage(chatId, '✅ መረጃዎ ለአድሚን ተልኳል። በጥቂት ደቂቃዎች ውስጥ ሒሳብዎ ይሞላል!', mainKeyboard);
+  } else if (state === 'WAITING_WITHDRAW') {
+    const amt = Number(text.replace(/[^0-9.]/g, ''));
+    if (!Number.isFinite(amt) || amt < 50) {
+      await sendTgMessage(chatId, '⚠️ እባክዎ ትክክለኛ የብር መጠን (ከ50 ብር ጀምሮ) ያስገቡ።');
+    } else if (amt > w.balance) {
+      await sendTgMessage(chatId, `⚠️ በቂ ቀሪ ሒሳብ የለዎትም። ያለዎት: *${w.balance} ብር*`);
+    } else {
+      w.balance -= amt;
+      await sendTgMessage(
+        ADMIN_ID,
+        `💸 *የገንዘብ ማውጣት ጥያቄ (Withdrawal)!*\n👤 ተጫዋች: ${userName} (ID: \`${chatId}\`)\n💵 መጠን: *${amt} ብር*\n💰 ቀሪ ሒሳብ: *${w.balance} ብር*`
+      );
+      userStates.delete(String(chatId));
+      await sendTgMessage(chatId, `✅ *${amt} ብር* ወጪ እንዲደረግ ጥያቄዎ ተልኳል። ቀሪ ሒሳብዎ: *${w.balance} ብር*`, mainKeyboard);
     }
   }
+
   res.sendStatus(200);
 });
 
-
 app.listen(PORT, () => console.log('Running'));
+
+   
