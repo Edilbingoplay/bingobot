@@ -10,7 +10,7 @@ app.use(express.static(__dirname));
 const PORT = process.env.PORT || 3000;
 const ADMIN_ID = 8334791462;
 const TELEBIRR_NUMBER = '0984960995';
-const APP_URL = 'https://onrender.com';
+const APP ://onrender.com';
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB Connected Successfully!'))
