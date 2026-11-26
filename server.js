@@ -7,7 +7,7 @@ app.use(express.static(__dirname));
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_ID = 8334791462;
-const APP_URL = 'https://onrender.com';
+const APP_URL = 'https://' + 'bingobot-0vk4' + '.onrender.com';
 
 const wallets = new Map();
 const games = new Map();
@@ -20,13 +20,13 @@ function getWallet(id) {
 }
 
 async function sendTgMessage(chatId, text, replyMarkup = undefined) {
-  const tgUrl = `https://telegram.org{process.env.BOT_TOKEN}/sendMessage`;
+  const tgUrl = 'https://' + 'api.telegram.org' + '/bot' + process.env.BOT_TOKEN + '/sendMessage';
   await fetch(tgUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       chat_id: chatId,
-      text,
+      text: text,
       parse_mode: 'Markdown',
       reply_markup: replyMarkup
     })
@@ -34,38 +34,47 @@ async function sendTgMessage(chatId, text, replyMarkup = undefined) {
 }
 
 const mainKeyboard = {
-  keyboard: [
-    [{ text: '🎮 ጨዋታ ጀምር (Play Bingo)' }],
-    [{ text: '💰 ቀሪ ሒሳብ' }, { text: '💳 ገንዘብ አስገባ' }],
-    [{ text: '💸 ገንዘብ አውጣ' }]
-  ],
+  keyboard: Array.of(
+    Array.of({ text: '🎮 ጨዋታ ጀምር (Play Bingo)' }),
+    Array.of({ text: '💰 ቀሪ ሒሳብ' }, { text: '💳 ገንዘብ አስገባ' }),
+    Array.of({ text: '💸 ገንዘብ አውጣ' })
+  ),
   resize_keyboard: true
 };
 
 const cancelKeyboard = {
-  keyboard: [[{ text: '❌ ሰርዝ (Cancel)' }]],
+  keyboard: Array.of(Array.of({ text: '❌ ሰርዝ (Cancel)' })),
   resize_keyboard: true
 };
 
 function makeCard() {
-  const ranges = [[1, 15], [16, 30], [31, 45], [46, 60], [61, 75]];
-  const card = ranges.map(([min, max]) => {
-    const pool = [];
+  const ranges = Array.of(
+    Array.of(1, 15),
+    Array.of(16, 30),
+    Array.of(31, 45),
+    Array.of(46, 60),
+    Array.of(61, 75)
+  );
+  const card = ranges.map((pair) => {
+    const min = pair.at(0);
+    const max = pair.at(1);
+    const pool = Array.of();
     for (let n = min; n <= max; n++) pool.push(n);
     pool.sort(() => Math.random() - 0.5);
     return pool.slice(0, 5);
   });
-  card[2][2] = 'FREE';
+  card.at(2).splice(2, 1, 'FREE');
   return card;
 }
 
 function hasWin(card, called) {
-  const ok = (r, c) => card[c][r] === 'FREE' || called.has(card[c][r]);
+  const ok = (r, c) => card.at(c).at(r) === 'FREE' || called.has(card.at(c).at(r));
+  const idx = Array.of(0, 1, 2, 3, 4);
   for (let i = 0; i < 5; i++) {
-    if ([0, 1, 2, 3, 4].every(c => ok(i, c))) return true;
-    if ([0, 1, 2, 3, 4].every(r => ok(r, i))) return true;
+    if (idx.every(c => ok(i, c))) return true;
+    if (idx.every(r => ok(r, i))) return true;
   }
-  return [0, 1, 2, 3, 4].every(i => ok(i, i)) || [0, 1, 2, 3, 4].every(i => ok(i, 4 - i));
+  return idx.every(i => ok(i, i)) || idx.every(i => ok(i, 4 - i));
 }
 
 app.get('/api/wallet/:userId', (req, res) => res.json(getWallet(req.params.userId)));
@@ -81,7 +90,7 @@ app.post('/api/wallet/deposit', (req, res) => {
 app.post('/api/game/create', (req, res) => {
   const stake = Number(req.body.stake || 10);
   if (!Number.isFinite(stake) || stake <= 0) return res.status(400).json({ error: 'Invalid stake' });
-  const g = { gameId: String(req.body.gameId || 'default'), stake, pot: 0, status: 'open', calledNumbers: [], players: {}, winner: null };
+  const g = { gameId: String(req.body.gameId || 'default'), stake: stake, pot: 0, status: 'open', calledNumbers: Array.of(), players: {}, winner: null };
   games.set(g.gameId, g);
   res.json(g);
 });
@@ -94,20 +103,20 @@ app.post('/api/game/join', (req, res) => {
   w.balance -= g.stake;
   g.pot += g.stake;
   const card = makeCard();
-  g.players[String(req.body.userId)] = { userId: String(req.body.userId), card };
-  res.json({ balance: w.balance, pot: g.pot, card });
+  g.players[String(req.body.userId)] = { userId: String(req.body.userId), card: card };
+  res.json({ balance: w.balance, pot: g.pot, card: card });
 });
 
 app.post('/api/game/call', (req, res) => {
   const g = games.get(String(req.body.gameId || 'default'));
   if (!g) return res.status(404).json({ error: 'Not found' });
   const used = new Set(g.calledNumbers);
-  const left = [];
+  const left = Array.of();
   for (let n = 1; n <= 75; n++) if (!used.has(n)) left.push(n);
   if (!left.length) return res.json({ message: 'Done', calledNumbers: g.calledNumbers });
-  const nextNumber = left[Math.floor(Math.random() * left.length)];
+  const nextNumber = left.at(Math.floor(Math.random() * left.length));
   g.calledNumbers.push(nextNumber);
-  res.json({ nextNumber, calledNumbers: g.calledNumbers });
+  res.json({ nextNumber: nextNumber, calledNumbers: g.calledNumbers });
 });
 
 app.post('/api/game/claim-bingo', async (req, res) => {
@@ -120,7 +129,7 @@ app.post('/api/game/claim-bingo', async (req, res) => {
     const prize = g.pot;
     const w = getWallet(req.body.userId);
     w.balance += prize;
-    g.winner = { userId: String(req.body.userId), prize };
+    g.winner = { userId: String(req.body.userId), prize: prize };
     g.pot = 0;
     g.status = 'finished';
 
@@ -151,8 +160,8 @@ app.post('/webhook', async (req, res) => {
 
   if (text.startsWith('/add ') && chatId === ADMIN_ID) {
     const parts = text.split(' ');
-    const targetId = parts[1];
-    const amt = Number(parts[2]);
+    const targetId = parts.at(1);
+    const amt = Number(parts.at(2));
     if (targetId && Number.isFinite(amt) && amt > 0) {
       const targetWallet = getWallet(targetId);
       targetWallet.balance += amt;
@@ -166,10 +175,15 @@ app.post('/webhook', async (req, res) => {
 
   if (text === '/start' || text === '/play' || text === '🎮 ጨዋታ ጀምር (Play Bingo)') {
     userStates.delete(String(chatId));
+    const playMarkup = {
+      inline_keyboard: Array.of(
+        Array.of({ text: '🎮 ቢንጎ ይጫወቱ (Play Bingo)', web_app: { url: APP_URL + '?uid=' + chatId } })
+      )
+    };
     await sendTgMessage(
       chatId,
       `🎲 እንኳን ወደ *Edil Bingos* በደህና መጡ፣ ${userName}!\n\n💰 ቀሪ ሒሳብዎ: *${w.balance} ብር*\n\nጨዋታውን ለመጀመር ከታች ያለውን ቁልፍ ይንኩ፦`,
-      { inline_keyboard: [[{ text: '🎮 ቢንጎ ይጫወቱ (Play Bingo)', web_app: { url: `${APP_URL}?uid=${chatId}` } }]] }
+      playMarkup
     );
     if (text === '/start') {
       await sendTgMessage(chatId, 'ከታች ያሉትን አማራጮች መጠቀም ይችላሉ 👇', mainKeyboard);
@@ -192,21 +206,22 @@ app.post('/webhook', async (req, res) => {
       await sendTgMessage(chatId, `⚠️ ገንዘብ ለማውጣት ቢያንስ *50 ብር* ሊኖርዎት ይገባል። የአሁን ሒሳብዎ: *${w.balance} ብር*`, mainKeyboard);
     } else {
       userStates.set(String(chatId), 'WAITING_WITHDRAW');
+      const withdrawMarkup = {
+        keyboard: Array.of(
+          Array.of({ text: '50 ብር' }, { text: '100 ብር' }),
+          Array.of({ text: '200 ብር' }, { text: '500 ብር' }),
+          Array.of({ text: '❌ ሰርዝ (Cancel)' })
+        ),
+        resize_keyboard: true
+      };
       await sendTgMessage(
         chatId,
         `💸 *ገንዘብ ወጪ ማድረጊያ (Withdrawal)*\nቀሪ ሒሳብዎ: *${w.balance} ብር*\n\nየሚያወጡትን መጠን ይምረጡ ወይም በቁጥር ይጻፉ፦`,
-        {
-          keyboard: [
-            [{ text: '50 ብር' }, { text: '100 ብር' }],
-            [{ text: '200 ብር' }, { text: '500 ብር' }],
-            [{ text: '❌ ሰርዝ (Cancel)' }]
-          ],
-          resize_keyboard: true
-        }
+        withdrawMarkup
       );
     }
   } else if (state === 'WAITING_DEPOSIT') {
-    const info = text || '[የደረሰኝ ፎቶ ተልኳል]';
+    const info = text || 'የደረሰኝ ፎቶ ተልኳል';
     await sendTgMessage(
       ADMIN_ID,
       `🔔 *አዲስ የገንዘብ ማስገባት ጥያቄ!*\n👤 ተጫዋች: ${userName} (ID: \`${chatId}\`)\n📝 መልእክት: ${info}\n\nሒሳቡን ለመሙላት ይህን ይላኩ፡\n\`/add ${chatId} 100\``
@@ -235,4 +250,17 @@ app.post('/webhook', async (req, res) => {
 
 app.listen(PORT, () => console.log('Running'));
 
-   
+
+
+
+
+
+      
+
+  
+  
+
+
+
+
+
