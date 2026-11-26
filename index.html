@@ -146,14 +146,8 @@
     const tg = window.Telegram && window.Telegram.WebApp;
     if (tg) { tg.expand(); if (tg.disableVerticalSwipes) tg.disableVerticalSwipes(); }
 
-    let balance = 100;
-    let stake = 10;
-    let autoMark = true;
-    let selectedCartela = 401;
-    let lobbySeconds = 15;
-    let lobbyInterval, callInterval;
-    let calledNumbers = [];
-    let myCard = [];
+      let balance = 100, stake = 10, autoMark = true, selectedCartela = 401;
+    let lobbySeconds = 15, lobbyInterval, callInterval, calledNumbers = [], myCard = [];
     const takenCartelas = new Set([412, 428, 460, 465, 474, 475, 494]);
 
     function initLobby() {
@@ -162,4 +156,169 @@
       for (let i = 401; i <= 500; i++) {
         const div = document.createElement('div');
         div.className = 'c-ball' + (takenCartelas.has(i) ? ' taken' : '') + (i === selectedCartela ? ' selected' : '');
+        div.innerText = i;
+        div.onclick = () => {
+          selectedCartela = i;
+          document.querySelectorAll('.c-ball').forEach(b => b.classList.remove('selected'));
+          div.classList.add('selected');
+        };
+        grid.appendChild(div);
+      }
+      startLobbyTimer();
+    }
+
+    function toggleAuto() {
+      autoMark = !autoMark;
+      document.getElementById('autoSwitch').classList.toggle('on', autoMark);
+    }
+
+    function changeStake(delta) {
+      stake = Math.min(50, Math.max(10, stake + delta));
+      document.getElementById('stakeVal').innerText = stake;
+    }
+
+    function startLobbyTimer() {
+      clearInterval(lobbyInterval);
+      lobbySeconds = 15;
+      document.getElementById('lobbyTimer').innerText = lobbySeconds + 's';
+      lobbyInterval = setInterval(() => {
+        lobbySeconds--;
+        document.getElementById('lobbyTimer').innerText = lobbySeconds + 's';
+        if (lobbySeconds <= 0) { clearInterval(lobbyInterval); startGame(); }
+      }, 1000);
+    }
+
+    function generateCard() {
+      const cols = [];
+      for (let c = 0; c < 5; c++) {
+        const min = c * 15 + 1;
+        const nums = [];
+        while (nums.length < 5) {
+          const n = Math.floor(Math.random() * 15) + min;
+          if (!nums.includes(n)) nums.push(n);
+        }
+        cols.push(nums);
+      }
+      cols[2][2] = '*';
+      return cols;
+    }
+
+    function startGame() {
+      if (balance >= stake) { balance -= stake; document.getElementById('userBalance').innerText = balance; }
+      document.getElementById('lobbyScreen').style.display = 'none';
+      document.getElementById('gameScreen').style.display = 'block';
+      document.getElementById('gameStake').innerText = stake;
+      document.getElementById('gamePot').innerText = Math.floor(38 * stake * 0.8);
+      document.getElementById('chosenCardLabel').innerText = 'ካርቴላ #' + selectedCartela;
+      calledNumbers = [];
+      document.getElementById('calledCount').innerText = '0';
+      document.getElementById('currentCall').innerText = '--';
+
+      const b75 = document.getElementById('board75');
+      b75.innerHTML = '';
+      for (let r = 0; r < 15; r++) {
+        for (let c = 0; c < 5; c++) {
+          const num = c * 15 + r + 1;
+          const cell = document.createElement('div');
+          cell.className = 'b-cell';
+          cell.id = 'b75-' + num;
+          cell.innerText = num;
+          b75.appendChild(cell);
+        }
+      }
+
+      myCard = generateCard();
+      const pGrid = document.getElementById('playerCardGrid');
+      pGrid.innerHTML = '';
+      ['B','I','N','G','O'].forEach((l, idx) => {
+        const h = document.createElement('div');
+        h.className = 'p-head ' + ['bg-b','bg-i','bg-n','bg-g','bg-o'][idx];
+        h.innerText = l;
+        pGrid.appendChild(h);
+      });
+      for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 5; c++) {
+          const val = myCard[c][r];
+          const cell = document.createElement('div');
+          cell.className = 'p-cell' + (val === '*' ? ' free' : '');
+          cell.dataset.num = val;
+          cell.innerText = val;
+          cell.onclick = () => { if (val !== '*') cell.classList.toggle('marked'); };
+          pGrid.appendChild(cell);
+        }
+      }
+
+      const pool = Array.from({length: 75}, (_, i) => i + 1).sort(() => Math.random() - 0.5);
+      callInterval = setInterval(() => {
+        if (pool.length === 0) return;
+        const num = pool.pop();
+        calledNumbers.push(num);
+        const letter = num <= 15 ? 'B' : num <= 30 ? 'I' : num <= 45 ? 'N' : num <= 60 ? 'G' : 'O';
+        document.getElementById('currentCall').innerText = letter + num;
+        document.getElementById('calledCount').innerText = calledNumbers.length;
+        const bEl = document.getElementById('b75-' + num);
+        if (bEl) bEl.classList.add('called');
+        if (autoMark) {
+          document.querySelectorAll('.p-cell').forEach(el => {
+            if (Number(el.dataset.num) === num) el.classList.add('marked');
+          });
+        }
+        if (calledNumbers.length >= 32 && Math.random() < 0.12) {
+          finishGame('ተጫዋች (' + (300 + Math.floor(Math.random()*99)) + ')', generateCard(), [0, 6, 12, 18, 24]);
+        }
+      }, 2200);
+    }
+
+    function claimBingo() {
+      const cells = Array.from(document.querySelectorAll('.p-cell'));
+      const marked = cells.map(c => c.classList.contains('marked') || c.classList.contains('free'));
+          const lines = [new Array(0,1,2,3,4), new Array(5,6,7,8,9), new Array(10,11,12,13,14), new Array(15,16,17,18,19), new Array(20,21,22,23,24), new Array(0,5,10,15,20), new Array(1,6,11,16,21), new Array(2,7,12,17,22), new Array(3,8,13,18,23), new Array(4,9,14,19,24), new Array(0,6,12,18,24), new Array(4,8,12,16,20)];
+
+      const winLine = lines.find(line => line.every(idx => marked[idx]));
+      if (!winLine) { alert('ገና ቢንጎ አልሞላም! (አንድ ሙሉ መስመር ወይም ዲያጎናል ይሙሉ)'); return; }
+      const pot = Number(document.getElementById('gamePot').innerText);
+      balance += pot;
+      document.getElementById('userBalance').innerText = balance;
+      const user = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.first_name) || 'እርስዎ';
+      finishGame(user + ' (' + selectedCartela + ')', myCard, winLine);
+    }
+
+    function finishGame(winnerLabel, cardCols, winIndices) {
+      clearInterval(callInterval);
+      document.getElementById('winnerText').innerText = winnerLabel + ' has won the game.';
+      const wGrid = document.getElementById('winnerCardGrid');
+      wGrid.innerHTML = '';
+      ['B','I','N','G','O'].forEach(l => {
+        const h = document.createElement('div'); h.className = 'w-head'; h.innerText = l; wGrid.appendChild(h);
+      });
+      for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 5; c++) {
+          const idx = r * 5 + c;
+          const cell = document.createElement('div');
+          cell.className = 'w-cell' + (winIndices.includes(idx) ? ' win-line' : '');
+          cell.innerText = cardCols[c][r];
+          wGrid.appendChild(cell);
+        }
+      }
+      document.getElementById('winnerModal').style.display = 'flex';
+      let sec = 5;
+      document.getElementById('redirectCountdown').innerText = 'Redirecting to the Lobby in ' + sec + ' seconds...';
+      const redir = setInterval(() => {
+        sec--;
+        document.getElementById('redirectCountdown').innerText = 'Redirecting to the Lobby in ' + sec + ' seconds...';
+        if (sec <= 0) {
+          clearInterval(redir);
+          document.getElementById('winnerModal').style.display = 'none';
+          document.getElementById('gameScreen').style.display = 'none';
+          document.getElementById('lobbyScreen').style.display = 'block';
+          initLobby();
+        }
+      }, 1000);
+    }
+
+    initLobby();
+  </script>
+</body>
+</html>
+
 
