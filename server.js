@@ -2,16 +2,15 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 
-const app = express()
+const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
 const PORT = process.env.PORT || 3000;
-const ADMIN_ID = 8334791462;
+const ADMIN_ID = 8334791462; // የእርስዎን ትክክለኛ Telegram ID እዚህ ያስገቡ
 const TELEBIRR_NUMBER = '0984960995';
-const APP_URL = 'https://onrender.com';
-
+const APP_URL = 'https://የእርስዎ-ሊንክ.onrender.com'; // የ Render ሊንክዎን እዚህ ያስገቡ
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB Connected Successfully!'))
@@ -34,6 +33,22 @@ async function getWallet(id) {
     w = await Wallet.create({ userId: k, balance: 0 });
   }
   return w;
+}
+
+async function sendTgMessage(chatId, text, replyMarkup = undefined) {
+  const tgUrl = `https://telegram.org{process.env.BOT_TOKEN}/sendMessage`;
+  const body = {
+    chat_id: chatId,
+    text: text,
+    parse_mode: 'Markdown'
+  };
+  if (replyMarkup) body.reply_markup = replyMarkup;
+
+  await fetch(tgUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).catch(err => console.error('TG Error:', err));
 }
 
 const room = {
@@ -92,11 +107,9 @@ async function startCentralGame() {
 
   room.phase = 'PLAYING';
   room.pot = Math.floor(validPot * 0.8);
-  room.calledNumbers = [];  
-                            
-  room.winner = null;  room.winners = Array.of();
-
-  
+  room.calledNumbers = [];
+  room.winner = null;
+  room.winners = [];
   room.pool = Array.from({ length: 75 }, (_, i) => i + 1).sort(() => Math.random() - 0.5);
 }
 
@@ -144,10 +157,9 @@ app.get('/api/game/state/:userId', async (req, res) => {
     taken: taken,
     myCartelas: myCartelas,
     playersCount: playersCount,
-    winner: room.winner,    winners: room.winners,
-
-    balance: w.balance   
-
+    winner: room.winner,
+    winners: room.winners,
+    balance: w.balance
   });
 });
 
@@ -195,47 +207,52 @@ app.post('/api/cartelas/release', (req, res) => {
 });
 
 app.post('/api/game/win', async (req, res) => {
-  if (room.phase !== 'PLAYING' || room.winner) {
-    return res.json({ accepted: false, winner: room.winner });
-  }
+  if (room.phase !== 'PLAYING') return res.json({ accepted: false });
+
   const uid = String(req.body.userId || '');
-  const userName = String(req.body.userName || 'ተጫዋች');
   const cartelaId = Number(req.body.cartelaId || 0);
+  const cartelaInfo = room.lockedCartelas.get(cartelaId);
+  const realName = (cartelaInfo && cartelaInfo.userName && cartelaInfo.userName !== 'ተጫዋች')
+    ? cartelaInfo.userName
+    : (req.body.userName && req.body.userName !== 'ተጫዋች' ? req.body.userName : 'ተጫዋች');
   const cardCols = req.body.cardCols;
   const winIndices = req.body.winIndices;
 
-  const w = await getWallet(uid);
-  w.balance += room.pot;
-  await w.save();
+  if (!room.winners) room.winners = [];
+  if (room.winners.some(w => w.userId === uid && w.cartelaId === cartelaId)) return res.json({ accepted: true });
 
-  room.winner = {
-    userId: uid,
-    userName: userName,
-    cartelaId: cartelaId,
-    prize: room.pot,
-    cardCols: cardCols,
-    winIndices: winIndices
-  };
-  room.phase = 'FINISHED';
-  room.timer = 6;
+  if (room.winners.length === 0) {
+    room.winners.push({ userId: uid, userName: realName, cartelaId: cartelaId, cardCols: cardCols, winIndices: winIndices });
 
-  res.json({ accepted: true, winner: room.winner, balance: w.balance });
+    setTimeout(async () => {
+      const count = room.winners.length;
+      const share = Math.floor(room.pot / count);
+      for (const w of room.winners) {
+        w.prize = share;
+        const wallet = await getWallet(w.userId);
+        wallet.balance += share;
+        await wallet.save();
+
+        if (w.userId && w.userId !== 'guest') {
+          await sendTgMessage(
+            w.userId,
+            `🎉🏆 *እንኳን ደስ አለዎት ${w.userName}!*\n\n` +
+            (count > 1 ? `ከ ${count} አሸናፊዎች ጋር ደራሹን ተካፍለው ` : `በካርቴላ *#${w.cartelaId}* አሸንፈው `) +
+            `*${share} ብር* ወደ ዋሌትዎ ገብቷል!\n💰 አዲስ ቀሪ ሒሳብዎ: *${wallet.balance} ብር*`
+          );
+        }
+      }
+      room.winner = room.winners[0];
+      room.phase = 'FINISHED';
+      room.timer = 7;
+    }, 1500);
+
+    return res.json({ accepted: true });
+  }
+
+  room.winners.push({ userId: uid, userName: realName, cartelaId: cartelaId, cardCols: cardCols, winIndices: winIndices });
+  res.json({ accepted: true });
 });
-
-const tgUrl = 'https://telegram.org' + process.env.BOT_TOKEN + '/sendMessage';
-
-  const tgUrl = 'https://telegram.org' + process.env.BOT_TOKEN + '/sendMessage';
-  await fetch(tgUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: text,
-      parse_mode: 'Markdown',
-      reply_markup: replyMarkup
-    })
-  }).catch(err => console.error('TG Error:', err));
-}
 
 const mainKeyboard = {
   keyboard: [
@@ -251,52 +268,8 @@ const cancelKeyboard = {
   resize_keyboard: true
 };
 
-app.post('/api/game/win', async (req, res) => {
-  if (room.phase !== 'PLAYING') return res.json({ accepted: false });
-
-  const uid = String(req.body.userId || '');
-  const cartelaId = Number(req.body.cartelaId || 0);
-  const cartelaInfo = room.lockedCartelas.get(cartelaId);
-  const realName = (cartelaInfo && cartelaInfo.userName && cartelaInfo.userName !== 'ተጫዋች')
-    ? cartelaInfo.userName
-    : (req.body.userName && req.body.userName !== 'ተጫዋች' ? req.body.userName : 'ተጫዋች');
-  const cardCols = req.body.cardCols;
-  const winIndices = req.body.winIndices;
-
-  if (!room.winners) room.winners = Array.of();
-  if (room.winners.some(w => w.userId === uid && w.cartelaId === cartelaId)) return res.json({ accepted: true });
-
-  if (room.winners.length === 0) {
-    room.winners.push({ userId: uid, userName: realName, cartelaId: cartelaId, cardCols: cardCols, winIndices: winIndices });
-
-    setTimeout(async () => {
-      const count = room.winners.length;
-      const share = Math.floor(room.pot / count);
-      room.winners.forEach(w => {
-        w.prize = share;
-        const wallet = getWallet(w.userId);
-        wallet.balance += share;
-        if (w.userId && w.userId !== 'guest') {
-          sendTgMessage(
-            w.userId,
-            `🎉🏆 *እንኳን ደስ አለዎት ${w.userName}!*\n\n` +
-            (count > 1 ? `ከ ${count} አሸናፊዎች ጋር ደራሹን ተካፍለው ` : `በካርቴላ *#${w.cartelaId}* አሸንፈው `) +
-            `*${share} ብር* ወደ ዋሌትዎ ገብቷል!\n💰 አዲስ ቀሪ ሒሳብዎ: *${wallet.balance} ብር*`
-          );
-        }
-      });
-      room.winner = room.winners.at(0);
-      room.phase = 'FINISHED';
-      room.timer = 7;
-    }, 1500);
-
-    return res.json({ accepted: true });
-  }
-
-  room.winners.push({ userId: uid, userName: realName, cartelaId: cartelaId, cardCols: cardCols, winIndices: winIndices });
-  res.json({ accepted: true });
-});
-
+// Telegram Webhook Endpoint
+app.post('/webhook', async (req, res) => {
   const msg = req.body.message;
   if (!msg) return res.sendStatus(200);
 
@@ -316,8 +289,8 @@ app.post('/api/game/win', async (req, res) => {
 
   if (text.startsWith('/add ') && chatId === ADMIN_ID) {
     const parts = text.split(' ');
-        const targetId = String(parts.at(1) || '');
-    const amt = Number(parts.at(2));
+    const targetId = String(parts[1] || '');
+    const amt = Number(parts[2]);
 
     if (targetId && Number.isFinite(amt) && amt >= 50 && amt <= 500) {
       const targetWallet = await getWallet(targetId);
@@ -340,6 +313,8 @@ app.post('/api/game/win', async (req, res) => {
         [{ text: '🎮 ቢንጎ ይጫወቱ (Play Bingo)', web_app: { url: APP_URL + '?uid=' + chatId } }]
       ]
     };
+    await sendTgMessage(
+      chatId,
     await sendTgMessage(
       chatId,
       `🎲 እንኳን ወደ *Edil Bingos* በደህና መጡ፣ ${userName}!\n\n💰 ቀሪ ሒሳብዎ: *${w.balance} ብር*\n🎯 መደብ: *5 ብር - 10 ብር*\n\nጨዋታውን ለመጀመር ከታች ያለውን ቁልፍ ይንኩ፦`,
@@ -401,9 +376,8 @@ app.post('/api/game/win', async (req, res) => {
       );
     }
   } else if (state === 'WAITING_DEPOSIT') {
-        const amt = numMatch ? Number(numMatch.at(0)) : 0;
-
-    const amt = numMatch ? Number(numMatch[0]) : 0;
+    const numMatch = text.match(/\d+/);
+    const amt = numMatch ? Number(numMatch.at(0)) : 0;
     if (amt > 0 && (amt < 50 || amt > 500)) {
       await sendTgMessage(chatId, '⚠️ በአንድ ጊዜ ማስገባት የሚቻለው *ዝቅተኛ 50 ብር* እና *ከፍተኛ 500 ብር* ብቻ ነው! እባክዎ ትክክለኛ መጠን ይላኩ።');
       return res.sendStatus(200);
@@ -491,4 +465,4 @@ app.post('/api/game/win', async (req, res) => {
   res.sendStatus(200);
 });
 
-app.listen(PORT, () => console.log('Running'));
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
