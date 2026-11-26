@@ -8,9 +8,9 @@ app.use(express.json());
 app.use(express.static(__dirname));
 
 const PORT = process.env.PORT || 3000;
-const ADMIN_ID = 8334791462; // የእርስዎን ትክክለኛ Telegram ID እዚህ ያስገቡ
+const ADMIN_ID = 8334791462;
 const TELEBIRR_NUMBER = '0984960995';
-const APP_URL = 'https://የእርስዎ-ሊንክ.onrender.com'; // የ Render ሊንክዎን እዚህ ያስገቡ
+const APP_URL = 'https://onrender.com';
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB Connected Successfully!'))
@@ -242,7 +242,7 @@ app.post('/api/game/win', async (req, res) => {
           );
         }
       }
-      room.winner = room.winners[0];
+      room.winner = room.winners.at(0);
       room.phase = 'FINISHED';
       room.timer = 7;
     }, 1500);
@@ -268,7 +268,6 @@ const cancelKeyboard = {
   resize_keyboard: true
 };
 
-// Telegram Webhook Endpoint
 app.post('/webhook', async (req, res) => {
   const msg = req.body.message;
   if (!msg) return res.sendStatus(200);
@@ -289,8 +288,8 @@ app.post('/webhook', async (req, res) => {
 
   if (text.startsWith('/add ') && chatId === ADMIN_ID) {
     const parts = text.split(' ');
-    const targetId = String(parts[1] || '');
-    const amt = Number(parts[2]);
+    const targetId = String(parts.at(1) || '');
+    const amt = Number(parts.at(2));
 
     if (targetId && Number.isFinite(amt) && amt >= 50 && amt <= 500) {
       const targetWallet = await getWallet(targetId);
@@ -315,154 +314,27 @@ app.post('/webhook', async (req, res) => {
     };
     await sendTgMessage(
       chatId,
-    await sendTgMessage(
-      chatId,
       `🎲 እንኳን ወደ *Edil Bingos* በደህና መጡ፣ ${userName}!\n\n💰 ቀሪ ሒሳብዎ: *${w.balance} ብር*\n🎯 መደብ: *5 ብር - 10 ብር*\n\nጨዋታውን ለመጀመር ከታች ያለውን ቁልፍ ይንኩ፦`,
       playMarkup
-    );
-    if (text === '/start') {
-      await sendTgMessage(chatId, 'ከታች ያሉትን አማራጮች መጠቀም ይችላሉ 👇', mainKeyboard);
-    }
-  } else if (text === '/balance' || text === '💰 ቀሪ ሒሳብ') {
-    userStates.delete(uidStr);
-    await sendTgMessage(chatId, `💰 የእርስዎ ቀሪ ሒሳብ (Balance): *${w.balance} ብር* ነው።`, mainKeyboard);
-  } else if (text === '/deposit' || text === '💳 ገንዘብ አስገባ') {
-    if (pendingDeposits.has(uidStr)) {
-      await sendTgMessage(
-        chatId,
-        '⏳ *ያስገቡት የገንዘብ ጥያቄ ገና በመረጋገጥ ላይ ነው!*\n\nየላኩት ገንዘብ ወደ ዋሌትዎ ሳይገባ ድጋሚ ገቢ ማድረግ አይችሉም። እባክዎ ትንሽ ይጠብቁ።',
-        mainKeyboard
-      );
-      return res.sendStatus(200);
-    }
-
-    userStates.set(uidStr, 'WAITING_DEPOSIT');
-    const depositMarkup = {
-      keyboard: [
-        [{ text: '50 ብር' }, { text: '100 ብር' }],
-        [{ text: '200 ብር' }, { text: '500 ብር' }],
-        [{ text: '❌ ሰርዝ (Cancel)' }]
-      ],
-      resize_keyboard: true
-    };
-    await sendTgMessage(
-      chatId,
-      `💳 *ገንዘብ ለማስገባት (Deposit)*\n` +
-      `📌 ዝቅተኛ: *50 ብር* | ከፍተኛ: *500 ብር*\n\n` +
-      `📱 *በቴሌብር (Telebirr):* \`${TELEBIRR_NUMBER}\`\n` +
-      `*(ቁጥሩን ሲነኩት በቀጥታ Copy ይሆናል)*\n\n` +
-      `ገንዘቡን ካስገቡ በኋላ *የላኩትን የብር መጠን (ከ50-500 ብር) እና Transaction ID* እዚህ ይላኩ፦`,
-      depositMarkup
-    );
-  } else if (text === '/withdrawal' || text === '💸 ገንዘብ አውጣ') {
-    if (w.balance < 50) {
-      await sendTgMessage(chatId, `⚠️ ገንዘብ ለማውጣት ዋሌትዎ ላይ ቢያንስ *50 ብር* ሊኖርዎት ይገባል።\n💰 የአሁን ቀሪ ሒሳብዎ: *${w.balance} ብር*`, mainKeyboard);
-    } else {
-      userStates.set(uidStr, 'WAITING_WITHDRAW');
-      const withdrawMarkup = {
-        keyboard: [
-          [{ text: '50 ብር' }, { text: `ሙሉውን (${w.balance} ብር)` }],
-          [{ text: '❌ ሰርዝ (Cancel)' }]
-        ],
-        resize_keyboard: true
-      };
-      await sendTgMessage(
-        chatId,
-        `💸 *ገንዘብ ወጪ ማድረጊያ (Withdrawal)*\n\n` +
-        `💰 ዋሌትዎ ላይ ያለ ቀሪ ሒሳብ: *${w.balance} ብር*\n` +
-        `📌 ማውጣት የሚችሉት: *ከ50 ብር እስከ ${w.balance} ብር* ብቻ ነው።\n\n` +
-        `የሚያወጡትን የብር መጠን በቁጥር ይጻፉ ወይም ከታች ይምረጡ፦`,
-        withdrawMarkup
-      );
-    }
-  } else if (state === 'WAITING_DEPOSIT') {
-    const numMatch = text.match(/\d+/);
-    const amt = numMatch ? Number(numMatch.at(0)) : 0;
-    if (amt > 0 && (amt < 50 || amt > 500)) {
-      await sendTgMessage(chatId, '⚠️ በአንድ ጊዜ ማስገባት የሚቻለው *ዝቅተኛ 50 ብር* እና *ከፍተኛ 500 ብር* ብቻ ነው! እባክዎ ትክክለኛ መጠን ይላኩ።');
-      return res.sendStatus(200);
-    }
-
-    pendingDeposits.add(uidStr);
-    const info = text || 'የደረሰኝ ፎቶ ተልኳል';
-    await sendTgMessage(
-      ADMIN_ID,
-      `🔔 *አዲስ የገንዘብ ማስገባት ጥያቄ (50-500 ብር)!*\n👤 ተጫዋች: ${userName} (ID: \`${chatId}\`)\n📝 መልእክት: ${info}\n\nሒሳቡን ለመሙላት ይህን ይላኩ፡\n\`/add ${chatId} ${amt >= 50 && amt <= 500 ? amt : 50}\``
-    );
-    userStates.delete(uidStr);
-    await sendTgMessage(
-      chatId,
-      '✅ መረጃዎ ለአድሚን ተልኳል። ገንዘቡ ወደ ዋሌትዎ እስኪገባ ድረስ ትንሽ ይጠብቁ!',
-      mainKeyboard
-    );
-  } else if (state === 'WAITING_WITHDRAW') {
-    let amt = 0;
-    if (text.startsWith('ሙሉውን')) {
-      amt = w.balance;
-    } else {
-      const cleaned = text.replace(/ብር/g, '').trim();
-      if (!/^\d+$/.test(cleaned)) {
-        await sendTgMessage(chatId, `⚠️ እባክዎ የሚያወጡትን የብር መጠን በቁጥር ብቻ ይጻፉ (ከ *50* እስከ *${w.balance}* ብር)።`);
-        return res.sendStatus(200);
-      }
-      amt = Number(cleaned);
-    }
-
-    if (!Number.isFinite(amt) || amt < 50) {
-      await sendTgMessage(chatId, '⚠️ ዝቅተኛው ማውጣት የሚቻለው መጠን *50 ብር* ነው! እባክዎ ከ50 ብር ጀምሮ ያስገቡ።');
-      return res.sendStatus(200);
-    }
-    if (amt > w.balance) {
-      await sendTgMessage(
-        chatId,
-        `🚫 *አይፈቀድም!* ዋሌትዎ ላይ ካለው ገንዘብ በላይ ማውጣት አይችሉም።\n💰 ዋሌትዎ ላይ ያለው ቀሪ ሒሳብ: *${w.balance} ብር* ብቻ ነው።`
-      );
-      return res.sendStatus(200);
-    }
-
-    pendingWithdrawAmount.set(uidStr, amt);
-    userStates.set(uidStr, 'WAITING_WITHDRAW_PHONE');
-    await sendTgMessage(
-      chatId,
-      `📱 *${amt} ብር* የሚላክበትን **የቴሌብር ስልክ ቁጥርዎን** ይጻፉ (ለምሳሌ፦ \`0911223344\`)፦`,
-      cancelKeyboard
-    );
-  } else if (state === 'WAITING_WITHDRAW_PHONE') {
-    const phone = text.replace(/\s+/g, '');
-    if (!/^(09|07)\d{8}$/.test(phone)) {
-      await sendTgMessage(chatId, '⚠️ እባክዎ ትክክለኛ ባለ 10 አሃዝ የኢትዮጵያ ስልክ ቁጥር ይጻፉ (በ `09` ወይም `07` የሚጀምር)።');
-      return res.sendStatus(200);
-    }
-
-    const amt = Number(pendingWithdrawAmount.get(uidStr) || 0);
-    if (amt < 50 || amt > w.balance) {
-      userStates.delete(uidStr);
-      pendingWithdrawAmount.delete(uidStr);
-      await sendTgMessage(chatId, '⚠️ የዋሌት ሒሳብዎ ስለተቀየረ እባክዎ እንደገና ይሞክሩ።', mainKeyboard);
-      return res.sendStatus(200);
-    }
-
-    w.balance -= amt;
-    await w.save();
-    pendingWithdrawAmount.delete(uidStr);
-    userStates.delete(uidStr);
-
-    await sendTgMessage(
-      ADMIN_ID,
-      `💸 *የገንዘብ ማውጣት ጥያቄ (Withdrawal)!*\n` +
-      `👤 ተጫዋች: ${userName} (ID: \`${chatId}\`)\n` +
-      `💵 የሚላክ መጠን: *${amt} ብር*\n` +
-      `📱 የቴሌብር ስልክ: \`${phone}\`\n` +
-      `💰 የቀረው ዋሌት ሒሳብ: *${w.balance} ብር*`
-    );
-    await sendTgMessage(
-      chatId,
-      `✅ *${amt} ብር* ወደ ቴሌብር ቁጥር \`${phone}\` እንዲላክ ጥያቄዎ ተልኳል።\n💰 አዲስ የዋሌት ቀሪ ሒሳብዎ: *${w.balance} ብር*`,
-      mainKeyboard
-    );
-  }
-
-  res.sendStatus(200);
+    );}
+const amt = Number(pendingWithdrawAmount.get(uidStr) || 0);
+if (amt < 50 || amt > w.balance) {
+userStates.delete(uidStr);
+pendingWithdrawAmount.delete(uidStr);
+await sendTgMessage(chatId, '⚠️ የዋሌት ሒሳብዎ ስለተቀየረ እባክዎ እንደገና ይሞክሩ።', mainKeyboard);
+return res.sendStatus(200);
+}
+w.balance -= amt;
+await w.save();
+pendingWithdrawAmount.delete(uidStr);
+userStates.delete(uidStr);
+await sendTgMessage(
+ADMIN_ID,
+💸 *የገንዘብ ማውጣት ጥያቄ (Withdrawal)!*\n +
+👤 ተጫዋች: ${userName} (ID: \${chatId}`)\n+💵 የሚላክ መጠን: ${amt} ብር\n+📱 የቴሌብር ስልክ: `${phone}`\n+💰 የቀረው ዋሌት ሒሳብ: ${w.balance} ብር); await sendTgMessage( chatId,✅ ${amt} ብር ወደ ቴሌብር ቁጥር `${phone}` እንዲላክ ጥያቄዎ ተልኳል።\n💰 አዲስ የዋሌት ቀሪ ሒሳብዎ: ${w.balance} ብር`,
+mainKeyboard
+);
+}
+res.sendStatus(200);
 });
-
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(🚀 Server running on port ${PORT}));
