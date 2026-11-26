@@ -4,20 +4,199 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
+
 const PORT = process.env.PORT || 3000;
 const ADMIN_ID = 8334791462;
 const TELEBIRR_NUMBER = '0984960995';
 const APP_URL = 'https://' + 'bingobot-0vk4' + '.onrender.com';
+
 const wallets = new Map();
 const userStates = new Map();
-const lockedCartelas = new Map();
 const pendingDeposits = new Set();
 const pendingWithdrawAmount = new Map();
+
 function getWallet(id) {
   const k = String(id);
   if (!wallets.has(k)) wallets.set(k, { userId: k, balance: 0 });
   return wallets.get(k);
 }
+
+const room = {
+  phase: 'LOBBY',
+  timer: 25,
+  stake: 5,
+  pot: 0,
+  calledNumbers: Array.of(),
+  pool: Array.of(),
+  lockedCartelas: new Map(),
+  winner: null
+};
+
+function resetRoomToLobby() {
+  room.phase = 'LOBBY';
+  room.timer = 25;
+  room.pot = 0;
+  room.calledNumbers = Array.of();
+  room.pool = Array.of();
+  room.lockedCartelas.clear();
+  room.winner = null;
+}
+
+function startCentralGame() {
+  if (room.lockedCartelas.size === 0) {
+    room.timer = 25;
+    return;
+  }
+
+  let validPot = 0;
+  const userCounts = new Map();
+  for (const [cid, info] of room.lockedCartelas.entries()) {
+    userCounts.set(info.userId, (userCounts.get(info.userId) || 0) + 1);
+  }
+
+  for (const [uid, count] of userCounts.entries()) {
+    const cost = count * room.stake;
+    const w = getWallet(uid);
+    if (w.balance >= cost) {
+      w.balance -= cost;
+      validPot += cost;
+    } else {
+      for (const [cid, info] of room.lockedCartelas.entries()) {
+        if (info.userId === uid) room.lockedCartelas.delete(cid);
+      }
+    }
+  }
+
+  if (room.lockedCartelas.size === 0) {
+    resetRoomToLobby();
+    return;
+  }
+
+  room.phase = 'PLAYING';
+  room.pot = Math.floor(validPot * 0.8);
+  room.calledNumbers = Array.of();
+  room.winner = null;
+  room.pool = Array.from({ length: 75 }, (_, i) => i + 1).sort(() => Math.random() - 0.5);
+}
+
+let tickCount = 0;
+setInterval(() => {
+  tickCount++;
+  if (room.phase === 'LOBBY') {
+    if (room.lockedCartelas.size > 0) {
+      room.timer--;
+      if (room.timer <= 0) startCentralGame();
+    } else {
+      room.timer = 25;
+    }
+  } else if (room.phase === 'PLAYING') {
+    if (tickCount % 3 === 0) {
+      if (room.pool.length > 0 && !room.winner) {
+        room.calledNumbers.push(room.pool.pop());
+      } else if (room.pool.length === 0 && !room.winner) {
+        room.phase = 'FINISHED';
+        room.timer = 6;
+      }
+    }
+  } else if (room.phase === 'FINISHED') {
+    room.timer--;
+    if (room.timer <= 0) resetRoomToLobby();
+  }
+}, 1000);
+
+app.get('/api/game/state/:userId', (req, res) => {
+  const uid = String(req.params.userId || '');
+  const w = getWallet(uid);
+  const taken = Array.from(room.lockedCartelas.keys());
+  const myCartelas = Array.of();
+  for (const [cid, info] of room.lockedCartelas.entries()) {
+    if (info.userId === uid) myCartelas.push(cid);
+  }
+  const playersCount = new Set(Array.from(room.lockedCartelas.values()).map(v => v.userId)).size;
+
+  res.json({
+    phase: room.phase,
+    timer: room.timer,
+    stake: room.stake,
+    pot: room.pot,
+    calledNumbers: room.calledNumbers,
+    taken: taken,
+    myCartelas: myCartelas,
+    playersCount: playersCount,
+    winner: room.winner,
+    balance: w.balance
+  });
+});
+
+app.post('/api/game/stake', (req, res) => {
+  if (room.phase !== 'LOBBY') return res.status(400).json({ error: 'Game started' });
+  const s = Number(req.body.stake);
+  if (s === 5 || s === 10) room.stake = s;
+  res.json({ stake: room.stake });
+});
+
+app.post('/api/cartelas/lock', (req, res) => {
+  if (room.phase !== 'LOBBY') return res.status(400).json({ error: 'ጨዋታው ተጀምሯል! ቀጣዩን ዙር ይጠብቁ።' });
+  const cid = Number(req.body.cartelaId);
+  const uid = String(req.body.userId || '');
+  const userName = String(req.body.userName || 'ተጫዋች');
+  if (!cid || !uid) return res.status(400).json({ error: 'Invalid' });
+
+  if (room.lockedCartelas.has(cid) && room.lockedCartelas.get(cid).userId !== uid) {
+    return res.status(409).json({ error: 'ይህ ካርቴላ በሌላ ተጫዋች ተይዟል!' });
+  }
+
+  let myCount = 0;
+  for (const info of room.lockedCartelas.values()) {
+    if (info.userId === uid) myCount++;
+  }
+  if (myCount >= 3) return res.status(400).json({ error: 'እስከ 3 ካርቴላ ብቻ ነው የሚፈቀደው!' });
+
+  const w = getWallet(uid);
+  if (w.balance < (myCount + 1) * room.stake) {
+    return res.status(400).json({ error: 'በቂ ቀሪ ሒሳብ የለዎትም!' });
+  }
+
+  room.lockedCartelas.set(cid, { userId: uid, userName: userName });
+  res.json({ locked: true });
+});
+
+app.post('/api/cartelas/release', (req, res) => {
+  if (room.phase !== 'LOBBY') return res.status(400).json({ error: 'Locked' });
+  const cid = Number(req.body.cartelaId);
+  const uid = String(req.body.userId || '');
+  if (room.lockedCartelas.get(cid)?.userId === uid) {
+    room.lockedCartelas.delete(cid);
+  }
+  res.json({ released: true });
+});
+
+app.post('/api/game/win', (req, res) => {
+  if (room.phase !== 'PLAYING' || room.winner) {
+    return res.json({ accepted: false, winner: room.winner });
+  }
+  const uid = String(req.body.userId || '');
+  const userName = String(req.body.userName || 'ተጫዋች');
+  const cartelaId = Number(req.body.cartelaId || 0);
+  const cardCols = req.body.cardCols;
+  const winIndices = req.body.winIndices;
+
+  const w = getWallet(uid);
+  w.balance += room.pot;
+
+  room.winner = {
+    userId: uid,
+    userName: userName,
+    cartelaId: cartelaId,
+    prize: room.pot,
+    cardCols: cardCols,
+    winIndices: winIndices
+  };
+  room.phase = 'FINISHED';
+  room.timer = 6;
+
+  res.json({ accepted: true, winner: room.winner, balance: w.balance });
+});
 
 async function sendTgMessage(chatId, text, replyMarkup = undefined) {
   const tgUrl = 'https://' + 'api.telegram.org' + '/bot' + process.env.BOT_TOKEN + '/sendMessage';
@@ -47,47 +226,6 @@ const cancelKeyboard = {
   resize_keyboard: true
 };
 
-app.get('/api/cartelas/taken', (req, res) => {
-  const taken = Array.from(lockedCartelas.keys());
-  const uniquePlayers = new Set(lockedCartelas.values()).size;
-  res.json({ taken: taken, playersCount: uniquePlayers });
-});
-
-app.post('/api/cartelas/lock', (req, res) => {
-  const cid = Number(req.body.cartelaId);
-  const uid = String(req.body.userId || '');
-  if (!cid || !uid) return res.status(400).json({ error: 'Invalid' });
-  if (lockedCartelas.has(cid) && lockedCartelas.get(cid) !== uid) {
-    return res.status(409).json({ error: 'Already taken' });
-  }
-  lockedCartelas.set(cid, uid);
-  res.json({ locked: true });
-});
-
-app.post('/api/cartelas/release', (req, res) => {
-  const cid = Number(req.body.cartelaId);
-  const uid = String(req.body.userId || '');
-  if (lockedCartelas.get(cid) === uid) {
-    lockedCartelas.delete(cid);
-  }
-  res.json({ released: true });
-});
-
-app.post('/api/cartelas/reset', (req, res) => {
-  lockedCartelas.clear();
-  res.json({ reset: true });
-});
-
-app.get('/api/wallet/:userId', (req, res) => res.json(getWallet(req.params.userId)));
-
-app.post('/api/wallet/deposit', (req, res) => {
-  const amt = Number(req.body.amount);
-  if (!req.body.userId || !Number.isFinite(amt)) return res.status(400).json({ error: 'Invalid input' });
-  const w = getWallet(req.body.userId);
-  w.balance = Math.max(0, w.balance + amt);
-  res.json(w);
-});
-
 app.post('/webhook', async (req, res) => {
   const msg = req.body.message;
   if (!msg) return res.sendStatus(200);
@@ -101,6 +239,7 @@ app.post('/webhook', async (req, res) => {
 
   if (text === '❌ ሰርዝ (Cancel)') {
     userStates.delete(uidStr);
+    pendingWithdrawAmount.delete(uidStr);
     await sendTgMessage(chatId, '✅ ሂደቱ ተሰርዟል። ወደ ዋናው ሜኑ ተመልሰዋል።', mainKeyboard);
     return res.sendStatus(200);
   }
@@ -123,6 +262,7 @@ app.post('/webhook', async (req, res) => {
 
   if (text === '/start' || text === '/play' || text === '🎮 ጨዋታ ጀምር (Play Bingo)') {
     userStates.delete(uidStr);
+    pendingWithdrawAmount.delete(uidStr);
     const playMarkup = {
       inline_keyboard: Array.of(
         Array.of({ text: '🎮 ቢንጎ ይጫወቱ (Play Bingo)', web_app: { url: APP_URL + '?uid=' + chatId } })
@@ -211,14 +351,7 @@ app.post('/webhook', async (req, res) => {
   } else if (state === 'WAITING_WITHDRAW') {
     let amt = 0;
     if (text.startsWith('ሙሉውን')) {
-          pendingWithdrawAmount.set(uidStr, amt);
-    userStates.set(uidStr, 'WAITING_WITHDRAW_PHONE');
-    await sendTgMessage(
-      chatId,
-      `📱 *${amt} ብር* የሚላክበትን **የቴሌብር ስልክ ቁጥርዎን** ይጻፉ (ለምሳሌ፦ \`0911223344\`)፦`,
-      cancelKeyboard
-    );
-
+      amt = w.balance;
     } else {
       const cleaned = text.replace(/ብር/g, '').trim();
       if (!/^\d+$/.test(cleaned)) {
@@ -240,16 +373,43 @@ app.post('/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
+    pendingWithdrawAmount.set(uidStr, amt);
+    userStates.set(uidStr, 'WAITING_WITHDRAW_PHONE');
+    await sendTgMessage(
+      chatId,
+      `📱 *${amt} ብር* የሚላክበትን **የቴሌብር ስልክ ቁጥርዎን** ይጻፉ (ለምሳሌ፦ \`0911223344\`)፦`,
+      cancelKeyboard
+    );
+  } else if (state === 'WAITING_WITHDRAW_PHONE') {
+    const phone = text.replace(/\s+/g, '');
+    if (!/^(09|07)\d{8}$/.test(phone)) {
+      await sendTgMessage(chatId, '⚠️ እባክዎ ትክክለኛ ባለ 10 አሃዝ የኢትዮጵያ ስልክ ቁጥር ይጻፉ (በ `09` ወይም `07` የሚጀምር)።');
+      return res.sendStatus(200);
+    }
+
+    const amt = Number(pendingWithdrawAmount.get(uidStr) || 0);
+    if (amt < 50 || amt > w.balance) {
+      userStates.delete(uidStr);
+      pendingWithdrawAmount.delete(uidStr);
+      await sendTgMessage(chatId, '⚠️ የዋሌት ሒሳብዎ ስለተቀየረ እባክዎ እንደገና ይሞክሩ።', mainKeyboard);
+      return res.sendStatus(200);
+    }
+
     w.balance -= amt;
+    pendingWithdrawAmount.delete(uidStr);
+    userStates.delete(uidStr);
 
     await sendTgMessage(
       ADMIN_ID,
-      `💸 *የገንዘብ ማውጣት ጥያቄ (Withdrawal)!*\n👤 ተጫዋች: ${userName} (ID: \`${chatId}\`)\n💵 የሚላክ መጠን: *${amt} ብር*\n💰 የቀረው ዋሌት ሒሳብ: *${w.balance} ብር*`
+      `💸 *የገንዘብ ማውጣት ጥያቄ (Withdrawal)!*\n` +
+      `👤 ተጫዋች: ${userName} (ID: \`${chatId}\`)\n` +
+      `💵 የሚላክ መጠን: *${amt} ብር*\n` +
+      `📱 የቴሌብር ስልክ: \`${phone}\`\n` +
+      `💰 የቀረው ዋሌት ሒሳብ: *${w.balance} ብር*`
     );
-    userStates.delete(uidStr);
     await sendTgMessage(
       chatId,
-      `✅ *${amt} ብር* ወጪ እንዲደረግ ጥያቄዎ ተልኳል።\n💰 አዲስ የዋሌት ቀሪ ሒሳብዎ: *${w.balance} ብር*`,
+      `✅ *${amt} ብር* ወደ ቴሌብር ቁጥር \`${phone}\` እንዲላክ ጥያቄዎ ተልኳል።\n💰 አዲስ የዋሌት ቀሪ ሒሳብዎ: *${w.balance} ብር*`,
       mainKeyboard
     );
   }
@@ -258,3 +418,8 @@ app.post('/webhook', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log('Running'));
+
+
+
+      
+    
