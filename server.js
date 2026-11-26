@@ -49,7 +49,6 @@ const cancelKeyboard = {
   resize_keyboard: true
 };
 
-// --- የካርቴላ መቆለፊያ API ---
 app.get('/api/cartelas/taken', (req, res) => {
   const taken = Array.from(lockedCartelas.keys());
   const uniquePlayers = new Set(lockedCartelas.values()).size;
@@ -81,7 +80,6 @@ app.post('/api/cartelas/reset', (req, res) => {
   res.json({ reset: true });
 });
 
-// --- የዋሌት API ---
 app.get('/api/wallet/:userId', (req, res) => res.json(getWallet(req.params.userId)));
 
 app.post('/api/wallet/deposit', (req, res) => {
@@ -92,7 +90,6 @@ app.post('/api/wallet/deposit', (req, res) => {
   res.json(w);
 });
 
-// --- የቴሌግራም ቦት Webhook ---
 app.post('/webhook', async (req, res) => {
   const msg = req.body.message;
   if (!msg) return res.sendStatus(200);
@@ -104,14 +101,12 @@ app.post('/webhook', async (req, res) => {
   const w = getWallet(chatId);
   const state = userStates.get(uidStr);
 
-  // 1. ሂደት መሰረዣ
   if (text === '❌ ሰርዝ (Cancel)') {
     userStates.delete(uidStr);
     await sendTgMessage(chatId, '✅ ሂደቱ ተሰርዟል። ወደ ዋናው ሜኑ ተመልሰዋል።', mainKeyboard);
     return res.sendStatus(200);
   }
 
-  // 2. አድሚን ሒሳብ ሲሞላ (/add USER_ID AMOUNT)
   if (text.startsWith('/add ') && chatId === ADMIN_ID) {
     const parts = text.split(' ');
     const targetId = String(parts.at(1) || '');
@@ -128,7 +123,6 @@ app.post('/webhook', async (req, res) => {
     return res.sendStatus(200);
   }
 
-  // 3. ጨዋታ መጀመሪያ
   if (text === '/start' || text === '/play' || text === '🎮 ጨዋታ ጀምር (Play Bingo)') {
     userStates.delete(uidStr);
     const playMarkup = {
@@ -147,8 +141,6 @@ app.post('/webhook', async (req, res) => {
   } else if (text === '/balance' || text === '💰 ቀሪ ሒሳብ') {
     userStates.delete(uidStr);
     await sendTgMessage(chatId, `💰 የእርስዎ ቀሪ ሒሳብ (Balance): *${w.balance} ብር* ነው።`, mainKeyboard);
-
-  // 4. ገንዘብ ማስገቢያ (ወደ ዋሌት ሳይገባ ድጋሚ እንዳያስገቡ ይከለክላል)
   } else if (text === '/deposit' || text === '💳 ገንዘብ አስገባ') {
     if (pendingDeposits.has(uidStr)) {
       await sendTgMessage(
@@ -177,8 +169,6 @@ app.post('/webhook', async (req, res) => {
       `ገንዘቡን ካስገቡ በኋላ *የላኩትን የብር መጠን (ከ50-500 ብር) እና Transaction ID* እዚህ ይላኩ፦`,
       depositMarkup
     );
-
-  // 5. ገንዘብ ማውጫ (ከ50 ብር ጀምሮ እስከ ዋሌቱ ሙሉ ገንዘብ ድረስ ብቻ)
   } else if (text === '/withdrawal' || text === '💸 ገንዘብ አውጣ') {
     if (w.balance < 50) {
       await sendTgMessage(chatId, `⚠️ ገንዘብ ለማውጣት ዋሌትዎ ላይ ቢያንስ *50 ብር* ሊኖርዎት ይገባል።\n💰 የአሁን ቀሪ ሒሳብዎ: *${w.balance} ብር*`, mainKeyboard);
@@ -200,8 +190,6 @@ app.post('/webhook', async (req, res) => {
         withdrawMarkup
       );
     }
-
-  // 6. የገቢ መረጃ መቀበያ
   } else if (state === 'WAITING_DEPOSIT') {
     const numMatch = text.match(/\d+/);
     const amt = numMatch ? Number(numMatch.at(0)) : 0;
@@ -222,8 +210,6 @@ app.post('/webhook', async (req, res) => {
       '✅ መረጃዎ ለአድሚን ተልኳል። ገንዘቡ ወደ ዋሌትዎ እስኪገባ ድረስ ትንሽ ይጠብቁ!',
       mainKeyboard
     );
-
-  // 7. ገንዘብ ማውጣት ማረጋገጫ
   } else if (state === 'WAITING_WITHDRAW') {
     let amt = 0;
     if (text.startsWith('ሙሉውን')) {
@@ -267,21 +253,3 @@ app.post('/webhook', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log('Running'));
-
-
-  
-
-
-     
-       
-    
-
-      
-
-  
-  
-
-
-
-
-
