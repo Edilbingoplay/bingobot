@@ -29,7 +29,9 @@ const room = {
   calledNumbers: Array.of(),
   pool: Array.of(),
   lockedCartelas: new Map(),
-  winner: null
+    winner: null, winners: Array.of(),
+
+
 };
 
 function resetRoomToLobby() {
@@ -39,7 +41,8 @@ function resetRoomToLobby() {
   room.calledNumbers = Array.of();
   room.pool = Array.of();
   room.lockedCartelas.clear();
-  room.winner = null;
+  room.winner = null;  room.winners = Array.of();
+
 }
 
 function startCentralGame() {
