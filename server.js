@@ -36,7 +36,8 @@ async function getWallet(id) {
 }
 
 async function sendTgMessage(chatId, text, replyMarkup = undefined) {
-  const tgUrl = `https://telegram.org{process.env.BOT_TOKEN}/sendMessage`;
+  const tgUrl = `;
+9117781258:AAGCFQ97yDFeejBRw4NHe6DFtnX3EZIt890
   const body = {
     chat_id: chatId,
     text: text,
