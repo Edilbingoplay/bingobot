@@ -92,8 +92,11 @@ async function startCentralGame() {
 
   room.phase = 'PLAYING';
   room.pot = Math.floor(validPot * 0.8);
-  room.calledNumbers = [];
-  room.winner = null;
+  room.calledNumbers = [];  
+                            
+  room.winner = null;  room.winners = Array.of();
+
+  
   room.pool = Array.from({ length: 75 }, (_, i) => i + 1).sort(() => Math.random() - 0.5);
 }
 
@@ -141,8 +144,10 @@ app.get('/api/game/state/:userId', async (req, res) => {
     taken: taken,
     myCartelas: myCartelas,
     playersCount: playersCount,
-    winner: room.winner,
-    balance: w.balance
+    winner: room.winner,    winners: room.winners,
+
+    balance: w.balance   
+
   });
 });
 
@@ -246,7 +251,52 @@ const cancelKeyboard = {
   resize_keyboard: true
 };
 
-app.post('/webhook', async (req, res) => {
+app.post('/api/game/win', async (req, res) => {
+  if (room.phase !== 'PLAYING') return res.json({ accepted: false });
+
+  const uid = String(req.body.userId || '');
+  const cartelaId = Number(req.body.cartelaId || 0);
+  const cartelaInfo = room.lockedCartelas.get(cartelaId);
+  const realName = (cartelaInfo && cartelaInfo.userName && cartelaInfo.userName !== 'ተጫዋች')
+    ? cartelaInfo.userName
+    : (req.body.userName && req.body.userName !== 'ተጫዋች' ? req.body.userName : 'ተጫዋች');
+  const cardCols = req.body.cardCols;
+  const winIndices = req.body.winIndices;
+
+  if (!room.winners) room.winners = Array.of();
+  if (room.winners.some(w => w.userId === uid && w.cartelaId === cartelaId)) return res.json({ accepted: true });
+
+  if (room.winners.length === 0) {
+    room.winners.push({ userId: uid, userName: realName, cartelaId: cartelaId, cardCols: cardCols, winIndices: winIndices });
+
+    setTimeout(async () => {
+      const count = room.winners.length;
+      const share = Math.floor(room.pot / count);
+      room.winners.forEach(w => {
+        w.prize = share;
+        const wallet = getWallet(w.userId);
+        wallet.balance += share;
+        if (w.userId && w.userId !== 'guest') {
+          sendTgMessage(
+            w.userId,
+            `🎉🏆 *እንኳን ደስ አለዎት ${w.userName}!*\n\n` +
+            (count > 1 ? `ከ ${count} አሸናፊዎች ጋር ደራሹን ተካፍለው ` : `በካርቴላ *#${w.cartelaId}* አሸንፈው `) +
+            `*${share} ብር* ወደ ዋሌትዎ ገብቷል!\n💰 አዲስ ቀሪ ሒሳብዎ: *${wallet.balance} ብር*`
+          );
+        }
+      });
+      room.winner = room.winners.at(0);
+      room.phase = 'FINISHED';
+      room.timer = 7;
+    }, 1500);
+
+    return res.json({ accepted: true });
+  }
+
+  room.winners.push({ userId: uid, userName: realName, cartelaId: cartelaId, cardCols: cardCols, winIndices: winIndices });
+  res.json({ accepted: true });
+});
+
   const msg = req.body.message;
   if (!msg) return res.sendStatus(200);
 
