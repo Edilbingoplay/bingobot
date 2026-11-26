@@ -10,7 +10,8 @@ app.use(express.static(__dirname));
 const PORT = process.env.PORT || 3000;
 const ADMIN_ID = 8334791462;
 const TELEBIRR_NUMBER = '0984960995';
-const APP ://onrender.com';
+const APP_URL = 'https://bingobot-0vk4.onrender.com';
+
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB Connected Successfully!'))
