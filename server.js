@@ -12,6 +12,7 @@ const ADMIN_ID = 8334791462;
 const TELEBIRR_NUMBER = '0984960995';
 const APP_URL = 'https://onrender.com';
 
+
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB Connected Successfully!'))
   .catch(err => console.error('❌ MongoDB Connection Error:', err));
@@ -216,7 +217,8 @@ app.post('/api/game/win', async (req, res) => {
   res.json({ accepted: true, winner: room.winner, balance: w.balance });
 });
 
-async function sendTgMessage(chatId, text, replyMarkup = undefined) {
+const tgUrl = 'https://telegram.org' + process.env.BOT_TOKEN + '/sendMessage';
+
   const tgUrl = 'https://telegram.org' + process.env.BOT_TOKEN + '/sendMessage';
   await fetch(tgUrl, {
     method: 'POST',
@@ -264,8 +266,9 @@ app.post('/webhook', async (req, res) => {
 
   if (text.startsWith('/add ') && chatId === ADMIN_ID) {
     const parts = text.split(' ');
-    const targetId = String(parts[1] || '');
-    const amt = Number(parts[2]);
+        const targetId = String(parts.at(1) || '');
+    const amt = Number(parts.at(2));
+
     if (targetId && Number.isFinite(amt) && amt >= 50 && amt <= 500) {
       const targetWallet = await getWallet(targetId);
       targetWallet.balance += amt;
@@ -348,7 +351,8 @@ app.post('/webhook', async (req, res) => {
       );
     }
   } else if (state === 'WAITING_DEPOSIT') {
-    const numMatch = text.match(/\d+/);
+        const amt = numMatch ? Number(numMatch.at(0)) : 0;
+
     const amt = numMatch ? Number(numMatch[0]) : 0;
     if (amt > 0 && (amt < 50 || amt > 500)) {
       await sendTgMessage(chatId, '⚠️ በአንድ ጊዜ ማስገባት የሚቻለው *ዝቅተኛ 50 ብር* እና *ከፍተኛ 500 ብር* ብቻ ነው! እባክዎ ትክክለኛ መጠን ይላኩ።');
