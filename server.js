@@ -10,7 +10,9 @@ app.use(express.static(__dirname));
 const PORT = process.env.PORT || 3000;
 const ADMIN_ID = 8334791462;
 const TELEBIRR_NUMBER = '0984960995';
-const APP_URL = 'https://bingobot-0vk4.onrender.com';
+const APP_URL = 'https://' + 'bingobot-0vk4' + '.onrender.com';
+
+
 
 
 mongoose.connect(process.env.MONGO_URI)
@@ -37,7 +39,8 @@ async function getWallet(id) {
 }
 
 async function sendTgMessage(chatId, text, replyMarkup = undefined) {
-  const tgUrl = `https://telegram.org{process.env.BOT_TOKEN}/sendMessage`;
+    const tgUrl = 'https://' + 'api.telegram.org' + '/bot' + process.env.BOT_TOKEN + '/sendMessage';
+
   const body = {
     chat_id: chatId,
     text: text,
