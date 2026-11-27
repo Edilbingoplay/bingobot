@@ -210,7 +210,8 @@ setInterval(async () => {
         room.calledNumbers.push(room.pool.pop());
         const calledSet = new Set(room.calledNumbers);
         for (const [cid, info] of room.lockedCartelas.entries()) {
-          if (String(info.userId).startsWith('bot_')) {
+            if (String(info.userId).startsWith('bot_') && room.calledNumbers.length >= 42 && Math.random() < 0.08) {
+ 
             const grid = getBotCartelaGrid(cid);
             const winIndices = checkBotWin(grid, calledSet);
             if (winIndices) {
@@ -321,6 +322,12 @@ app.post('/api/game/win', async (req, res) => {
     : (req.body.userName && req.body.userName !== 'ተጫዋች' ? req.body.userName : 'ተጫዋች');
   const cardCols = req.body.cardCols;
   const winIndices = req.body.winIndices;
+  const serverGrid = getBotCartelaGrid(cartelaId);
+  const calledSet = new Set(room.calledNumbers);
+  const realWin = checkBotWin(serverGrid, calledSet);
+  if (!realWin) {
+    return res.json({ accepted: false, error: 'ያልተጠሩ ቁጥሮችን ነክተዋል! ገና አልዘጉም።' });
+  }
 
   if (!room.winners) room.winners = [];
   if (room.winners.some(w => w.userId === uid && w.cartelaId === cartelaId)) return res.json({ accepted: true });
