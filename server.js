@@ -521,9 +521,10 @@ app.post('/webhook', async (req, res) => {
       `ገንዘቡን ካስገቡ በኋላ *የላኩትን የብር መጠን (ከ50-500 ብር) እና Transaction ID* እዚህ ይላኩ፦`,
       depositMarkup
     );
-          } else if (text === '🤝 ሰው ጋብዝ (Invite)') {
+      } else if (text.includes('ሰው ጋብዝ') || text === '/invite') {
       userStates.delete(uidStr);
-      const inviteLink = `https://t.me{BOT_USERNAME}?start=${uidStr}`;
+      const safeBotUser = BOT_USERNAME.replace(/_/g, '\\_');
+      const inviteLink = `https://t.me{safeBotUser}?start=${uidStr}`;
       await sendTgMessage(
         chatId,
         `🤝 *ጓደኞችዎን ይጋብዙና ቦነስ ያግኙ!*\n\n` +
@@ -531,6 +532,7 @@ app.post('/webhook', async (req, res) => {
         `🔗 የእርስዎ መጋበዣ ሊንክ:\n${inviteLink}`,
         mainKeyboard
       );
+
   
   } else if (text === '/withdrawal' || text === '💸 ገንዘብ አውጣ') {
     if (w.balance < 50) {
