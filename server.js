@@ -65,7 +65,7 @@ async function sendTgMessage(chatId, text, replyMarkup = undefined) {
 
 const room = {
   phase: 'LOBBY',
-  timer: 60,
+  timer: 50,
   stake: 10,
   pot: 0,
   calledNumbers: [],
@@ -322,12 +322,17 @@ app.post('/api/game/win', async (req, res) => {
     : (req.body.userName && req.body.userName !== 'ተጫዋች' ? req.body.userName : 'ተጫዋች');
   const cardCols = req.body.cardCols;
   const winIndices = req.body.winIndices;
-  const serverGrid = getBotCartelaGrid(cartelaId);
-  const calledSet = new Set(room.calledNumbers);
-  const realWin = checkBotWin(serverGrid, calledSet);
-  if (!realWin) {
+    const calledSet = new Set(room.calledNumbers);
+  const flatNums = Array.isArray(cardCols) ? cardCols.flat() : [];
+  const validWin = Array.isArray(winIndices) && winIndices.length >= 4 && winIndices.every(idx => {
+    if (idx === 12) return true;
+    const num = flatNums.at(idx);
+    return typeof num === 'number' && calledSet.has(num);
+  });
+  if (!validWin) {
     return res.json({ accepted: false, error: 'ያልተጠሩ ቁጥሮችን ነክተዋል! ገና አልዘጉም።' });
   }
+
 
   if (!room.winners) room.winners = [];
   if (room.winners.some(w => w.userId === uid && w.cartelaId === cartelaId)) return res.json({ accepted: true });
