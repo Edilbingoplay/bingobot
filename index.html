@@ -410,8 +410,12 @@
       activeGameStarted = false;
       if (!winnerShown && winner) {
         winnerShown = true;
-        document.getElementById('winnerText').innerText =
-          winner.userName + ' (ካርቴላ #' + winner.cartelaId + ') ' + winner.prize + ' ብር አሸንፈዋል!';
+                const isMe = String(winner.userId) === String(userId);
+        document.getElementById('winnerText').innerText = isMe
+          ? '🎉 እንኳን ደስ አለዎት! ' + winner.userName + ' አሸንፈዋል! (' + winner.prize + ' ብር)'
+          : '🏆 አሸናፊ: ' + winner.userName + ' (ካርቴላ #' + winner.cartelaId + ') ' + winner.prize + ' ብር አሸንፏል!';
+
+      
 
         const wGrid = document.getElementById('winnerCardGrid');
         wGrid.innerHTML = '';
