@@ -524,7 +524,8 @@ app.post('/webhook', async (req, res) => {
       } else if (text.includes('ሰው ጋብዝ') || text === '/invite') {
       userStates.delete(uidStr);
       const safeBotUser = BOT_USERNAME.replace(/_/g, '\\_');
-      const inviteLink = `https://t.me{safeBotUser}?start=${uidStr}`;
+      const inviteLink = `https://t.me/${safeBotUser}?start=${uidStr}`;
+
       await sendTgMessage(
         chatId,
         `🤝 *ጓደኞችዎን ይጋብዙና ቦነስ ያግኙ!*\n\n` +
