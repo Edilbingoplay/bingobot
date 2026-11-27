@@ -400,6 +400,19 @@ app.post('/webhook', async (req, res) => {
     );
     return res.sendStatus(200);
   }
+    if (text === '/refstats' && chatId === ADMIN_ID) {
+      const totalInvitedUsers = await Wallet.countDocuments({ referredBy: { $ne: '' } });
+      const rewardedUsers = await Wallet.countDocuments({ referralRewarded: true });
+      const totalBonusPaid = rewardedUsers * REFERRAL_BONUS;
+      await sendTgMessage(
+        chatId,
+        `📊 *የሪፈራል አጠቃላይ ሪፖርት (Referral Stats)*\n\n` +
+        `👥 በሪፈራል የገቡ ጠቅላላ ተጫዋቾች: *${totalInvitedUsers}*\n` +
+        `✅ ቦነስ የተከፈለባቸው (50+ ብር ያስገቡ): *${rewardedUsers}*\n` +
+        `💰 ጠቅላላ የተከፈለ የሪፈራል ቦነስ: *${totalBonusPaid} ብር*`
+      );
+      return res.sendStatus(200);
+    }
 
   if (text === '/users' && chatId === ADMIN_ID) {
     const topUsers = await Wallet.find({}).sort({ balance: -1 }).limit(15);
@@ -522,18 +535,25 @@ app.post('/webhook', async (req, res) => {
       `ገንዘቡን ካስገቡ በኋላ *የላኩትን የብር መጠን (ከ50-500 ብር) እና Transaction ID* እዚህ ይላኩ፦`,
       depositMarkup
     );
-      } else if (text.includes('ሰው ጋብዝ') || text === '/invite') {
+        } else if (text.includes('ሰው ጋብዝ') || text === '/invite') {
       userStates.delete(uidStr);
+      const totalInvited = await Wallet.countDocuments({ referredBy: uidStr });
+      const rewardedInvited = await Wallet.countDocuments({ referredBy: uidStr, referralRewarded: true });
+      const totalEarned = rewardedInvited * REFERRAL_BONUS;
       const safeBotUser = BOT_USERNAME.replace(/_/g, '\\_');
       const inviteLink = `https://t.me/${safeBotUser}?start=${uidStr}`;
-
       await sendTgMessage(
         chatId,
         `🤝 *ጓደኞችዎን ይጋብዙና ቦነስ ያግኙ!*\n\n` +
         `የጋበዙት ሰው ተመዝግቦ ቢያንስ *${MIN_DEPOSIT_FOR_BONUS} ብር* ሲያስገባ የ *${REFERRAL_BONUS} ብር* ቦነስ ወዲያውኑ ወደ ሒሳብዎ ይገባል!\n\n` +
+        `📊 *የእርስዎ የሪፈራል ሪፖርት፦*\n` +
+        `👥 የተጋበዙ ሰዎች: *${totalInvited}*\n` +
+        `✅ ቦነስ ያስገኙ: *${rewardedInvited}*\n` +
+        `💰 ጠቅላላ ያገኙት ቦነስ: *${totalEarned} ብር*\n\n` +
         `🔗 የእርስዎ መጋበዣ ሊንክ:\n${inviteLink}`,
         mainKeyboard
       );
+  
 
   
   } else if (text === '/withdrawal' || text === '💸 ገንዘብ አውጣ') {
