@@ -323,11 +323,13 @@ app.post('/api/game/win', async (req, res) => {
   const cardCols = req.body.cardCols;
   const winIndices = req.body.winIndices;
     const calledSet = new Set(room.calledNumbers);
-  const flatNums = Array.isArray(cardCols) ? cardCols.flat() : [];
+
+
   const validWin = Array.isArray(winIndices) && winIndices.length >= 4 && winIndices.every(idx => {
+const num = Array.isArray(cardCols) ? cardCols.at(idx % 5)?.at(Math.floor(idx / 5)) : null;
     if (idx === 12) return true;
-    const num = flatNums.at(idx);
     return typeof num === 'number' && calledSet.has(num);
+
   });
   if (!validWin) {
     return res.json({ accepted: false, error: 'ያልተጠሩ ቁጥሮችን ነክተዋል! ገና አልዘጉም።' });
