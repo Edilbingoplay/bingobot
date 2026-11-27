@@ -171,7 +171,7 @@ async function startCentralGame() {
           }
         }
 
-  }
+  
 
   const botCount = Array.from(room.lockedCartelas.values()).filter(v => String(v.userId).startsWith('bot_')).length;
   validPot += botCount * room.stake;
