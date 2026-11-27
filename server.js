@@ -374,8 +374,83 @@ const cancelKeyboard = {
 };
 
 app.post('/webhook', async (req, res) => {
+  if (req.body.callback_query) {
+    const cb = req.body.callback_query;
+    const cbChatId = cb.message?.chat?.id;
+    const cbMsgId = cb.message?.message_id;
+    const data = cb.data || '';
+        const tgApi = 'https://' + 'api.telegram.org/bot' + process.env.BOT_TOKEN;
+
+
+    if (cbChatId === ADMIN_ID) {
+      const parts = data.split('_');
+      const action = parts.at(0);
+      const type = parts.at(1);
+      const targetId = parts.at(2);
+      const amt = Number(parts.at(3) || 0);
+
+      if (action === 'app' && type === 'dep' && targetId && amt > 0) {
+        const targetWallet = await getWallet(targetId);
+        targetWallet.balance += amt;
+        let bonusNote = '';
+        if (amt >= MIN_DEPOSIT_FOR_BONUS && targetWallet.referredBy && !targetWallet.referralRewarded) {
+          targetWallet.referralRewarded = true;
+          const inviterWallet = await Wallet.findOneAndUpdate(
+            { userId: targetWallet.referredBy },
+            { $inc: { balance: REFERRAL_BONUS } },
+            { new: true }
+          );
+          if (inviterWallet) {
+            bonusNote = `\n🎁 ለጋባዡ (${targetWallet.referredBy}) የ *${REFERRAL_BONUS} ብር* ቦነስ ተሰጥቷል።`;
+            await sendTgMessage(targetWallet.referredBy, `🎉 የጋበዙት ተጫዋች ${amt} ብር ስላስገባ የ *${REFERRAL_BONUS} ብር* ሪፈራል ቦነስ አግኝተዋል!\n💰 አዲስ ሒሳብ: *${inviterWallet.balance} ብር*`);
+          }
+        }
+        await targetWallet.save();
+        pendingDeposits.delete(targetId);
+        await sendTgMessage(targetId, `🎉 *${amt} ብር* ወደ ዋሌትዎ ገብቷል!\n💰 አሁን ያለዎት ቀሪ ሒሳብ: *${targetWallet.balance} ብር*`, mainKeyboard);
+        await fetch(`${tgApi}/editMessageText`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: cbChatId, message_id: cbMsgId, text: `✅ ጸድቋል! ለተጫዋች ${targetId} ${amt} ብር ተጨምሯል።${bonusNote}` })
+        });
+      } else if (action === 'rej' && type === 'dep' && targetId) {
+        pendingDeposits.delete(targetId);
+        await sendTgMessage(targetId, `❌ የላኩት የገንዘብ ማስገቢያ ጥያቄ ውድቅ ተደርጓል። እባክዎ ትክክለኛውን የክፍያ መልዕክት ይላኩ።`, mainKeyboard);
+        await fetch(`${tgApi}/editMessageText`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: cbChatId, message_id: cbMsgId, text: `❌ የ ${targetId} የገንዘብ ማስገቢያ ጥያቄ ውድቅ ተደርጓል።` })
+        });
+      } else if (action === 'app' && type === 'wd' && targetId && amt > 0) {
+        await sendTgMessage(targetId, `✅ የ *${amt} ብር* የገንዘብ ማውጫ ጥያቄዎ ተቀባይነት አግኝቶ በቴሌብር ተልኮልዎታል!`, mainKeyboard);
+        await fetch(`${tgApi}/editMessageText`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: cbChatId, message_id: cbMsgId, text: `✅ ተከፍሏል! ለተጫዋች ${targetId} ${amt} ብር ተልኳል።` })
+        });
+      } else if (action === 'rej' && type === 'wd' && targetId && amt > 0) {
+        const targetWallet = await getWallet(targetId);
+        targetWallet.balance += amt;
+        await targetWallet.save();
+        await sendTgMessage(targetId, `❌ የ *${amt} ብር* የገንዘብ ማውጫ ጥያቄዎ ስላልጸደቀ ብሩ ወደ ዋሌትዎ ተመልሷል።\n💰 አዲስ ሒሳብ: *${targetWallet.balance} ብር*`, mainKeyboard);
+        await fetch(`${tgApi}/editMessageText`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: cbChatId, message_id: cbMsgId, text: `❌ ተሰርዟል! ለተጫዋች ${targetId} ${amt} ብር ወደ ዋሌቱ ተመልሷል።` })
+        });
+      }
+    }
+    await fetch(`${tgApi}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: cb.id })
+    });
+    return res.sendStatus(200);
+  }
+
   const msg = req.body.message;
   if (!msg) return res.sendStatus(200);
+
 
   const chatId = msg.chat.id;
   const uidStr = String(chatId);
@@ -383,6 +458,37 @@ app.post('/webhook', async (req, res) => {
   const text = (msg.text || '').trim();
   const w = await getWallet(chatId);
   const state = userStates.get(uidStr);
+  if (REQUIRED_CHANNEL && chatId !== ADMIN_ID) {
+    try {
+      const tgApi = 'https://' + 'api.telegram.org/bot' + process.env.BOT_TOKEN;
+      const memberRes = await fetch(`${tgApi}/getChatMember?chat_id=${encodeURIComponent(REQUIRED_CHANNEL)}&user_id=${chatId}`);
+      const memberData = await memberRes.json();
+      const status = memberData?.result?.status;
+      if (!memberData.ok || !['member', 'administrator', 'creator'].includes(status)) {
+        if (text.startsWith('/start ')) {
+          const refId = text.split(' ').at(1)?.trim() || '';
+          if (refId && refId !== uidStr && !w.referredBy && !w.referralRewarded) {
+            w.referredBy = refId;
+            await w.save();
+          }
+        }
+        const chClean = REQUIRED_CHANNEL.replace('@', '');
+        await fetch(`${tgApi}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: `⚠️ *ቦቱን ለመጠቀም መጀመሪያ ቻናላችንን ይቀላቀሉ!*\n\nከታች ያለውን አዝራር ተጭነው ቻናሉን **Join** ካደረጉ በኋላ **/start** የሚለውን ይጫኑ።`,
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [[{ text: '📢 ቻናሉን ተቀላቀል (Join Channel)', url: 'https://' + 't.me/' + chClean }]]
+            }
+          })
+        });
+        return res.sendStatus(200);
+      }
+    } catch (e) {}
+  }
 
   if (text === '❌ ሰርዝ (Cancel)') {
     userStates.delete(uidStr);
@@ -483,6 +589,25 @@ app.post('/webhook', async (req, res) => {
     }
     return res.sendStatus(200);
   }
+    if (text.startsWith('/deduct ') && chatId === ADMIN_ID) {
+      const parts = text.split(' ').filter(Boolean);
+      const targetId = parts.at(1);
+      const amt = Number(parts.at(2));
+      if (!targetId || isNaN(amt) || amt <= 0) {
+        await sendTgMessage(chatId, '⚠️ ትክክለኛ አጻጻፍ፦ `/deduct [UserID] [Amount]`\nምሳሌ፦ `/deduct 8334791462 50`');
+        return res.sendStatus(200);
+      }
+      const targetWallet = await getWallet(targetId);
+      if (targetWallet.balance < amt) {
+        await sendTgMessage(chatId, `⚠️ ተጫዋቹ በቂ ሒሳብ የለውም። አሁን ያለው ሒሳብ: *${targetWallet.balance} ብር*`);
+        return res.sendStatus(200);
+      }
+      targetWallet.balance -= amt;
+      await targetWallet.save();
+      await sendTgMessage(chatId, `✅ ከተጫዋች \`${targetId}\` ላይ *${amt} ብር* ተቀንሷል።\n💰 አዲስ ቀሪ ሒሳብ: *${targetWallet.balance} ብር*`);
+      await sendTgMessage(targetId, `ℹ️ ከዋሌትዎ ላይ *${amt} ብር* ተቀንሷል።\n💰 አዲስ ቀሪ ሒሳብ: *${targetWallet.balance} ብር*`, mainKeyboard);
+      return res.sendStatus(200);
+    }
 
       if (text.startsWith('/start') || text === '/play' || text === '🎮 ጨዋታ ጀምር (Play Bingo)') {
 
@@ -590,12 +715,21 @@ app.post('/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
-    pendingDeposits.add(uidStr);
-    const info = text || 'የደረሰኝ ፎቶ ተልኳል';
-    await sendTgMessage(
-      ADMIN_ID,
-      `🔔 *አዲስ የገንዘብ ማስገባት ጥያቄ (50-500 ብር)!*\n👤 ተጫዋች: ${userName} (ID: \`${chatId}\`)\n📝 መልእክት: ${info}\n\nሒሳቡን ለመሙላት ይህን ይላኩ፡\n\`/add ${chatId} ${amt >= 50 && amt <= 500 ? amt : 50}\``
-    );
+          pendingDeposits.add(uidStr);
+      const info = text || 'የደረሰኝ ፎቶ ተልኳል';
+      const validAmt = (amt >= 50 && amt <= 500) ? amt : 50;
+      const depButtons = {
+        inline_keyboard: [[
+          { text: `✅ አጽድቅ (${validAmt} ብር)`, callback_data: `app_dep_${chatId}_${validAmt}` },
+          { text: '❌ ሰርዝ (Reject)', callback_data: `rej_dep_${chatId}_0` }
+        ]]
+      };
+      await sendTgMessage(
+        ADMIN_ID,
+        `🔔 *አዲስ የገንዘብ ማስገባት ጥያቄ (50-500 ብር)!*\n👤 ተጫዋች: ${userName} (ID: \`${chatId}\`)\n📝 መልእክት: ${info}\n\nበአንድ ንኪኪ ለማጽደቅ ከታች ያለውን ይጫኑ (ወይም \`/add ${chatId} ${validAmt}\`)፦`,
+        depButtons
+      );
+
     userStates.delete(uidStr);
     await sendTgMessage(
       chatId,
@@ -654,14 +788,22 @@ app.post('/webhook', async (req, res) => {
     pendingWithdrawAmount.delete(uidStr);
     userStates.delete(uidStr);
 
-    await sendTgMessage(
-      ADMIN_ID,
-      `💸 *የገንዘብ ማውጣት ጥያቄ (Withdrawal)!*\n` +
-      `👤 ተጫዋች: ${userName} (ID: \`${chatId}\`)\n` +
-      `💵 የሚላክ መጠን: *${amt} ብር*\n` +
-      `📱 የቴሌብር ስልክ: \`${phone}\`\n` +
-      `💰 የቀረው ዋሌት ሒሳብ: *${w.balance} ብር*`
-    );
+          const wdButtons = {
+        inline_keyboard: [[
+          { text: `✅ ተከፍሏል (${amt} ብር)`, callback_data: `app_wd_${chatId}_${amt}` },
+          { text: '❌ ሰርዝ (ብሩን መልስ)', callback_data: `rej_wd_${chatId}_${amt}` }
+        ]]
+      };
+      await sendTgMessage(
+        ADMIN_ID,
+        `💸 *የገንዘብ ማውጣት ጥያቄ (Withdrawal)!*\n` +
+        `👤 ተጫዋች: ${userName} (ID: \`${chatId}\`)\n` +
+        `💵 የሚላክ መጠን: *${amt} ብር*\n` +
+        `📱 የቴሌብር ስልክ: \`${phone}\`\n` +
+        `💰 የቀረው ዋሌት ሒሳብ: *${w.balance} ብር*`,
+        wdButtons
+      );
+
     await sendTgMessage(
       chatId,
       `✅ *${amt} ብር* ወደ ቴሌብር ቁጥር \`${phone}\` እንዲላክ ጥያቄዎ ተልኳል።\n💰 አዲስ የዋሌት ቀሪ ሒሳብዎ: *${w.balance} ብር*`,
