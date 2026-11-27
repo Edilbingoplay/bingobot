@@ -11,8 +11,9 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_ID = 8334791462;
 const TELEBIRR_NUMBER = '0984960995';
 const APP_URL = 'https://' + 'bingobot-0vk4' + '.onrender.com';
-const BOT_USERNAME = 'EdilBingosBot'; // የቦትዎን ትክክለኛ Username ያለ @ እዚህ ይጻፉ
-const REFERRAL_BONUS = 15;
+const BOT_USERNAME = 'Edilbingosplaybot';
+
+const REFERRAL_BONUS = 10;
 const MIN_DEPOSIT_FOR_BONUS = 50;
 
 
