@@ -65,8 +65,8 @@ async function sendTgMessage(chatId, text, replyMarkup = undefined) {
 
 const room = {
   phase: 'LOBBY',
-  timer: 25,
-  stake: 5,
+  timer: 60,
+  stake: 10,
   pot: 0,
   calledNumbers: [],
   pool: [],
@@ -77,7 +77,7 @@ const room = {
 
 function resetRoomToLobby() {
   room.phase = 'LOBBY';
-  room.timer = 25;
+  room.timer = 60;
   room.pot = 0;
   room.calledNumbers = [];
   room.pool = [];
@@ -271,7 +271,7 @@ app.get('/api/game/state/:userId', async (req, res) => {
 app.post('/api/game/stake', (req, res) => {
   if (room.phase !== 'LOBBY') return res.status(400).json({ error: 'Game started' });
   const s = Number(req.body.stake);
-  if (s === 5 || s === 10) room.stake = s;
+  if (s === 10 || s === 10) room.stake = s;
   res.json({ stake: room.stake });
 });
 
