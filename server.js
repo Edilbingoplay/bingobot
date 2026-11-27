@@ -635,7 +635,7 @@ app.post('/webhook', async (req, res) => {
     };
     await sendTgMessage(
       chatId,
-      `🎲 እንኳን ወደ *Edil Bingos* በደህና መጡ፣ ${userName}!\n\n💰 ቀሪ ሒሳብዎ: *${w.balance} ብር*\n🎯 መደብ: *5 ብር - 10 ብር*\n\nጨዋታውን ለመጀመር ከታች ያለውን ቁልፍ ይንኩ፦`,
+      `🎲 እንኳን ወደ *Edil Bingos* በደህና መጡ፣ ${userName}!\n\n💰 ቀሪ ሒሳብዎ: *${w.balance} ብር*\n🎯 መደብ: *10 ብር*\n\nጨዋታውን ለመጀመር ከታች ያለውን ቁልፍ ይንኩ፦`,
       playMarkup);
             if (text.startsWith('/start')) {
 
