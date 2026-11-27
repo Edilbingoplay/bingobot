@@ -78,6 +78,41 @@ function resetRoomToLobby() {
   room.winners = [];
 }
 
+const BOT_NAMES = [
+  '@Dawit_B', '@Selam_K', '@Bereket99', '@Tigist_M', '@Yonas_A',
+  '@Meron_G', '@Henok_T', '@Bethlehem_S', '@Natnael_D', '@Hanna_W',
+  '@Abel_F', '@Rahel_Z', '@Robel_H', '@Mahlet_N', '@Eyob_L',
+  '@Kidist_R', '@Biniam_Y', '@Tsion_E', '@Samuel_P', '@Frehiwot_C',
+  '@Miki_V', '@Sosina_J', '@Nahom_Q', '@Eden_U', '@Kaleb_X'
+];
+
+function getBotCartelaGrid(cartelaId) {
+  let seed = cartelaId * 9973;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+  const cols = Array.of(Array.of(1, 15), Array.of(16, 30), Array.of(31, 45), Array.of(46, 60), Array.of(61, 75));
+  const grid = Array(25).fill(0);
+  for (let c = 0; c < 5; c++) {
+    const nums = [];
+    for (let n = cols.at(c).at(0); n <= cols.at(c).at(1); n++) nums.push(n);
+    nums.sort(() => rnd() - 0.5);
+    for (let r = 0; r < 5; r++) grid[r * 5 + c] = nums.at(r);
+  }
+  grid[12] = 0;
+  return grid;
+}
+
+function checkBotWin(grid, calledSet) {
+  const lines = Array.of(
+    Array.of(0, 1, 2, 3, 4), Array.of(5, 6, 7, 8, 9), Array.of(10, 11, 12, 13, 14), Array.of(15, 16, 17, 18, 19), Array.of(20, 21, 22, 23, 24),
+    Array.of(0, 5, 10, 15, 20), Array.of(1, 6, 11, 16, 21), Array.of(2, 7, 12, 17, 22), Array.of(3, 8, 13, 18, 23), Array.of(4, 9, 14, 19, 24),
+    Array.of(0, 6, 12, 18, 24), Array.of(4, 8, 12, 16, 20)
+  );
+  for (const line of lines) {
+    if (line.every(idx => idx === 12 || calledSet.has(grid.at(idx)))) return line;
+  }
+  return null;
+}
+
 async function startCentralGame() {
   if (room.lockedCartelas.size === 0) {
     room.timer = 25;
@@ -87,6 +122,7 @@ async function startCentralGame() {
   let validPot = 0;
   const userCounts = new Map();
   for (const [cid, info] of room.lockedCartelas.entries()) {
+    if (String(info.userId).startsWith('bot_')) continue;
     userCounts.set(info.userId, (userCounts.get(info.userId) || 0) + 1);
   }
 
@@ -104,10 +140,29 @@ async function startCentralGame() {
     }
   }
 
-  if (room.lockedCartelas.size === 0) {
+  const realCount = Array.from(room.lockedCartelas.values()).filter(v => !String(v.userId).startsWith('bot_')).length;
+  if (realCount === 0) {
     resetRoomToLobby();
     return;
   }
+
+  const shuffledNames = [...BOT_NAMES].sort(() => Math.random() - 0.5);
+  let nameIdx = 0;
+  while (room.lockedCartelas.size < 25) {
+    const randomCid = Math.floor(Math.random() * 100) + 1;
+    if (!room.lockedCartelas.has(randomCid)) {
+      const botName = shuffledNames.at(nameIdx % shuffledNames.length);
+      room.lockedCartelas.set(randomCid, {
+        userId: 'bot_' + randomCid,
+        userName: botName,
+        isBot: true
+      });
+      nameIdx++;
+    }
+  }
+
+  const botCount = Array.from(room.lockedCartelas.values()).filter(v => String(v.userId).startsWith('bot_')).length;
+  validPot += botCount * room.stake;
 
   room.phase = 'PLAYING';
   room.pot = Math.floor(validPot * 0.8);
@@ -117,25 +172,58 @@ async function startCentralGame() {
   room.pool = Array.from({ length: 75 }, (_, i) => i + 1).sort(() => Math.random() - 0.5);
 }
 
+
 let tickCount = 0;
 setInterval(async () => {
   tickCount++;
-  if (room.phase === 'LOBBY') {
-    if (room.lockedCartelas.size > 0) {
+    if (room.phase === 'LOBBY') {
+    const realPlayers = Array.from(room.lockedCartelas.values()).filter(v => !String(v.userId).startsWith('bot_')).length;
+    if (realPlayers > 0) {
       room.timer--;
+      if (room.lockedCartelas.size < 25 && Math.random() < 0.75) {
+        const cid = Math.floor(Math.random() * 100) + 1;
+        if (!room.lockedCartelas.has(cid)) {
+          const bName = BOT_NAMES.at(Math.floor(Math.random() * BOT_NAMES.length));
+          room.lockedCartelas.set(cid, { userId: 'bot_' + cid, userName: bName, isBot: true });
+        }
+      }
       if (room.timer <= 0) await startCentralGame();
     } else {
+      if (room.lockedCartelas.size > 0) room.lockedCartelas.clear();
       room.timer = 25;
     }
   } else if (room.phase === 'PLAYING') {
     if (tickCount % 3 === 0) {
       if (room.pool.length > 0 && !room.winner) {
         room.calledNumbers.push(room.pool.pop());
+        const calledSet = new Set(room.calledNumbers);
+        for (const [cid, info] of room.lockedCartelas.entries()) {
+          if (String(info.userId).startsWith('bot_')) {
+            const grid = getBotCartelaGrid(cid);
+            const winIndices = checkBotWin(grid, calledSet);
+            if (winIndices) {
+              room.winner = {
+                userId: info.userId,
+                userName: info.userName,
+                cartelaId: cid,
+                prize: room.pot,
+                grid,
+                winIndices
+              };
+              room.winners.push(room.winner);
+              room.phase = 'FINISHED';
+              room.timer = 7;
+              break;
+            }
+          }
+        }
       } else if (room.pool.length === 0 && !room.winner) {
         room.phase = 'FINISHED';
         room.timer = 6;
       }
     }
+
+      
   } else if (room.phase === 'FINISHED') {
     room.timer--;
     if (room.timer <= 0) resetRoomToLobby();
@@ -287,6 +375,49 @@ app.post('/webhook', async (req, res) => {
     userStates.delete(uidStr);
     pendingWithdrawAmount.delete(uidStr);
     await sendTgMessage(chatId, '✅ ሂደቱ ተሰርዟል። ወደ ዋናው ሜኑ ተመልሰዋል።', mainKeyboard);
+    return res.sendStatus(200);
+  }
+  if (text === '/stats' && chatId === ADMIN_ID) {
+    const allWallets = await Wallet.find({});
+    const totalUsers = allWallets.length;
+    const totalBalance = allWallets.reduce((sum, u) => sum + (u.balance || 0), 0);
+    const activePlayers = Array.from(room.lockedCartelas.values()).filter(v => !String(v.userId).startsWith('bot_')).length;
+    await sendTgMessage(
+      chatId,
+      `📊 *የቦቱ አጠቃላይ መረጃ (Stats)*\n\n` +
+      `👥 ጠቅላላ ተጫዋቾች: *${totalUsers}*\n` +
+      `💰 በዋሌት ያለ ጠቅላላ ብር: *${totalBalance} ብር*\n` +
+      `🎮 አሁን በጨዋታ ላይ ያሉ: *${activePlayers} ተጫዋቾች*\n` +
+      `🏆 የአሁኑ ዙር ደራሽ: *${room.pot} ብር*`
+    );
+    return res.sendStatus(200);
+  }
+
+  if (text === '/users' && chatId === ADMIN_ID) {
+    const topUsers = await Wallet.find({}).sort({ balance: -1 }).limit(15);
+    let listMsg = `📋 *ከፍተኛ ሂሳብ ያላቸው 15 ተጫዋቾች:*\n\n`;
+    topUsers.forEach((u, i) => {
+      listMsg += `${i + 1}. \`${u.userId}\` — *${u.balance} ብር*\n`;
+    });
+    await sendTgMessage(chatId, listMsg);
+    return res.sendStatus(200);
+  }
+
+  if (text.startsWith('/broadcast ') && chatId === ADMIN_ID) {
+    const broadcastMsg = text.slice(11).trim();
+    if (!broadcastMsg) return res.sendStatus(200);
+    const allWallets = await Wallet.find({});
+    await sendTgMessage(chatId, `⏳ መልዕክቱ ለ *${allWallets.length}* ተጫዋቾች እየተላከ ነው...`);
+    let sentCount = 0;
+    for (const u of allWallets) {
+      if (u.userId && !String(u.userId).startsWith('bot_')) {
+        try {
+          await sendTgMessage(u.userId, `📢 *ማስታወቂያ ከEdil Bingos:*\n\n${broadcastMsg}`);
+          sentCount++;
+        } catch (e) {}
+      }
+    }
+    await sendTgMessage(chatId, `✅ ማስታወቂያው ለ *${sentCount}* ተጫዋቾች በተሳካ ሁኔታ ተልኳል!`);
     return res.sendStatus(200);
   }
 
