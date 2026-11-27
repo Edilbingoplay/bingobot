@@ -15,6 +15,7 @@ const BOT_USERNAME = 'Edilbingosplaybot';
 
 const REFERRAL_BONUS = 10;
 const MIN_DEPOSIT_FOR_BONUS = 50;
+const REQUIRED_CHANNEL = '@EdilBingosOfficial';
 
 
 
