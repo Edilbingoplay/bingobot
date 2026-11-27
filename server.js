@@ -154,18 +154,22 @@ async function startCentralGame() {
   }
 
   const shuffledNames = [...BOT_NAMES].sort(() => Math.random() - 0.5);
-  let nameIdx = 0;
-  while (room.lockedCartelas.size < 25) {
-    const randomCid = Math.floor(Math.random() * 100) + 1;
-    if (!room.lockedCartelas.has(randomCid)) {
-      const botName = shuffledNames.at(nameIdx % shuffledNames.length);
-      room.lockedCartelas.set(randomCid, {
-        userId: 'bot_' + randomCid,
-        userName: botName,
-        isBot: true
-      });
-      nameIdx++;
-    }
+        let nameIdx = 0;
+        let botsAdded = 0;
+        while (botsAdded < 20 && room.lockedCartelas.size < 500) {
+          const randomCid = Math.floor(Math.random() * 500) + 1;
+          if (!room.lockedCartelas.has(randomCid)) {
+            const botName = shuffledNames.at(nameIdx % shuffledNames.length);
+            room.lockedCartelas.set(randomCid, {
+              userId: 'bot_' + randomCid,
+              userName: botName,
+              isBot: true
+            });
+            nameIdx++;
+            botsAdded++;
+          }
+        }
+
   }
 
   const botCount = Array.from(room.lockedCartelas.values()).filter(v => String(v.userId).startsWith('bot_')).length;
