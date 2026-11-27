@@ -326,8 +326,9 @@
             cell.dataset.num = val;
             cell.innerText = val;
             cell.onclick = () => {
-              if (val !== '*' && activeGameStarted) {
-                cell.classList.toggle('marked');
+              if (val !== '*' && activeGameStarted && document.getElementById('b75-' + val)?.classList.contains('called')) {
+              cell.classList.toggle('marked');
+
                 evaluateAutoBingo();
               }
             };
