@@ -676,7 +676,9 @@ app.post('/webhook', async (req, res) => {
       `📌 ዝቅተኛ: *50 ብር* | ከፍተኛ: *500 ብር*\n\n` +
       `📱 *በቴሌብር (Telebirr):* \`${TELEBIRR_NUMBER}\`\n` +
       `*(ቁጥሩን ሲነኩት በቀጥታ Copy ይሆናል)*\n\n` +
-      `ገንዘቡን ካስገቡ በኋላ *የላኩትን የብር መጠን (ከ50-500 ብር) እና Transaction ID* እዚህ ይላኩ፦`,
+      `ገንዘቡን ካስገቡ በኋላ *የላኩትን የብር መጠን (ከ50-500 ብር) እና Transaction ID* እዚህ ይላኩ፦`+
+              `\n\n⚠️ የሚያጋጥምዎት የክፍያ ችግር ካለ በዚህ @EdilBingosSupport የእርዳታ አገልግሎት አካውንት በኩል ማውራት ይችላሉ!`,
+
       depositMarkup
     );
         } else if (text.includes('ሰው ጋብዝ') || text === '/invite') {
