@@ -11,6 +11,9 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_ID = 8334791462;
 const TELEBIRR_NUMBER = '0984960995';
 const APP_URL = 'https://' + 'bingobot-0vk4' + '.onrender.com';
+const BOT_USERNAME = 'EdilBingosBot'; // የቦትዎን ትክክለኛ Username ያለ @ እዚህ ይጻፉ
+const REFERRAL_BONUS = 15;
+const MIN_DEPOSIT_FOR_BONUS = 50;
 
 
 
@@ -21,7 +24,9 @@ mongoose.connect(process.env.MONGO_URI)
 
 const walletSchema = new mongoose.Schema({
   userId: { type: String, required: true, unique: true },
-  balance: { type: Number, default: 0 }
+  balance: { type: Number, default: 30 },
+  referredBy: { type: String, default: '' },
+  referralRewarded: { type: Boolean, default: false }
 });
 const Wallet = mongoose.model('Wallet', walletSchema);
 
@@ -31,12 +36,13 @@ const pendingWithdrawAmount = new Map();
 
 async function getWallet(id) {
   const k = String(id);
-  let w = await Wallet.findOne({ userId: k });
-  if (!w) {
-    w = await Wallet.create({ userId: k, balance: 0 });
-  }
-  return w;
+  return await Wallet.findOneAndUpdate(
+    { userId: k },
+    { $setOnInsert: { userId: k, balance: 30 } },
+    { new: true, upsert: true }
+  );
 }
+
 
 async function sendTgMessage(chatId, text, replyMarkup = undefined) {
     const tgUrl = 'https://' + 'api.telegram.org' + '/bot' + process.env.BOT_TOKEN + '/sendMessage';
@@ -350,7 +356,8 @@ const mainKeyboard = {
   keyboard: [
     [{ text: '🎮 ጨዋታ ጀምር (Play Bingo)' }],
     [{ text: '💰 ቀሪ ሒሳብ' }, { text: '💳 ገንዘብ አስገባ' }],
-    [{ text: '💸 ገንዘብ አውጣ' }]
+        [{ text: '💸 ገንዘብ አውጣ' }, { text: '🤝 ሰው ጋብዝ (Invite)' }]
+
   ],
   resize_keyboard: true
 };
@@ -427,21 +434,49 @@ app.post('/webhook', async (req, res) => {
     const amt = Number(parts.at(2));
 
     if (targetId && Number.isFinite(amt) && amt >= 50 && amt <= 500) {
-      const targetWallet = await getWallet(targetId);
+          const targetWallet = await getWallet(targetId);
       targetWallet.balance += amt;
+
+      let bonusNote = '';
+      if (amt >= MIN_DEPOSIT_FOR_BONUS && targetWallet.referredBy && !targetWallet.referralRewarded) {
+        targetWallet.referralRewarded = true;
+        const inviterWallet = await Wallet.findOneAndUpdate(
+          { userId: targetWallet.referredBy },
+          { $inc: { balance: REFERRAL_BONUS } },
+          { new: true }
+        );
+        if (inviterWallet) {
+          bonusNote = `\n🎁 ለጋባዡ (${targetWallet.referredBy}) የ *${REFERRAL_BONUS} ብር* ቦነስ ተሰጥቷል።`;
+          await sendTgMessage(
+            targetWallet.referredBy,
+            `🎉 የጋበዙት ተጫዋች ${amt} ብር ስላስገባ የ *${REFERRAL_BONUS} ብር* ሪፈራል ቦነስ አግኝተዋል!\n💰 አዲስ ሒሳብ: *${inviterWallet.balance} ብር*`
+          );
+        }
+      }
+
       await targetWallet.save();
       pendingDeposits.delete(targetId);
-      await sendTgMessage(ADMIN_ID, `✅ ለተጫዋች \`${targetId}\` *${amt} ብር* ተጨምሯል። አዲስ ሒሳብ: *${targetWallet.balance} ብር*`);
+      await sendTgMessage(ADMIN_ID, `✅ ለተጫዋች \`${targetId}\` *${amt} ብር* ተጨምሯል።\nአዲስ ሒሳብ: *${targetWallet.balance} ብር*${bonusNote}`);
       await sendTgMessage(targetId, `🎉 *${amt} ብር* ወደ ዋሌትዎ ገብቷል!\n💰 አሁን ያለዎት ቀሪ ሒሳብ: *${targetWallet.balance} ብር*`, mainKeyboard);
+
     } else {
       await sendTgMessage(ADMIN_ID, '⚠️ አጠቃቀም: `/add USER_ID 100` (መጠኑ ከ50 እስከ 500 ብር መሆን አለበት)');
     }
     return res.sendStatus(200);
   }
 
-  if (text === '/start' || text === '/play' || text === '🎮 ጨዋታ ጀምር (Play Bingo)') {
+      if (text.startsWith('/start') || text === '/play' || text === '🎮 ጨዋታ ጀምር (Play Bingo)') {
+
     userStates.delete(uidStr);
     pendingWithdrawAmount.delete(uidStr);
+              if (text.startsWith('/start ')) {
+        const refId = text.split(' ').at(1)?.trim() || '';
+        if (refId && refId !== uidStr && !w.referredBy && !w.referralRewarded) {
+          w.referredBy = refId;
+          await w.save();
+        }
+      }
+
     const playMarkup = {
       inline_keyboard: [
         [{ text: '🎮 ቢንጎ ይጫወቱ (Play Bingo)', web_app: { url: APP_URL + '?uid=' + chatId } }]
@@ -451,7 +486,8 @@ app.post('/webhook', async (req, res) => {
       chatId,
       `🎲 እንኳን ወደ *Edil Bingos* በደህና መጡ፣ ${userName}!\n\n💰 ቀሪ ሒሳብዎ: *${w.balance} ብር*\n🎯 መደብ: *5 ብር - 10 ብር*\n\nጨዋታውን ለመጀመር ከታች ያለውን ቁልፍ ይንኩ፦`,
       playMarkup);
-       if (text === '/start') {
+            if (text.startsWith('/start')) {
+
       await sendTgMessage(chatId, 'ከታች ያሉትን አማራጮች መጠቀም ይችላሉ 👇', mainKeyboard);
     }
   } else if (text === '/balance' || text === '💰 ቀሪ ሒሳብ') {
@@ -485,6 +521,17 @@ app.post('/webhook', async (req, res) => {
       `ገንዘቡን ካስገቡ በኋላ *የላኩትን የብር መጠን (ከ50-500 ብር) እና Transaction ID* እዚህ ይላኩ፦`,
       depositMarkup
     );
+          } else if (text === '🤝 ሰው ጋብዝ (Invite)') {
+      userStates.delete(uidStr);
+      const inviteLink = `https://t.me{BOT_USERNAME}?start=${uidStr}`;
+      await sendTgMessage(
+        chatId,
+        `🤝 *ጓደኞችዎን ይጋብዙና ቦነስ ያግኙ!*\n\n` +
+        `የጋበዙት ሰው ተመዝግቦ ቢያንስ *${MIN_DEPOSIT_FOR_BONUS} ብር* ሲያስገባ የ *${REFERRAL_BONUS} ብር* ቦነስ ወዲያውኑ ወደ ሒሳብዎ ይገባል!\n\n` +
+        `🔗 የእርስዎ መጋበዣ ሊንክ:\n${inviteLink}`,
+        mainKeyboard
+      );
+  
   } else if (text === '/withdrawal' || text === '💸 ገንዘብ አውጣ') {
     if (w.balance < 50) {
       await sendTgMessage(chatId, `⚠️ ገንዘብ ለማውጣት ዋሌትዎ ላይ ቢያንስ *50 ብር* ሊኖርዎት ይገባል።\n💰 የአሁን ቀሪ ሒሳብዎ: *${w.balance} ብር*`, mainKeyboard);
