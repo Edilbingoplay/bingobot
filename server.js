@@ -709,10 +709,11 @@ app.post('/webhook', async (req, res) => {
           `👥 የተጋበዙ ሰዎች: *${totalInvited}*\n` +
           `✅ ቦነስ ያስገኙ: *${rewardedInvited}*\n` +
           `💰 ጠቅላላ ያገኙት ቦነስ: *${totalEarned} ብር*\n\n` +
-    `🔗 የእርስዎ መጋበዣ ሊንክ:\n\`${inviteLink}\``,
+            `🔗 የእርስዎ መጋበዣ ሊንክ:\n${inviteLink}`,
+
           {
             inline_keyboard: [
-              [{ text: '📤 ለጓደኞች ላክ (Share)', url: shareUrl }]
+              [{ text: '📤 ለጓደኞቾ ይላኩ (Share)', url: shareUrl }]
             ]
           }
         );
