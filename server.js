@@ -686,19 +686,27 @@ app.post('/webhook', async (req, res) => {
       const totalInvited = await Wallet.countDocuments({ referredBy: uidStr });
       const rewardedInvited = await Wallet.countDocuments({ referredBy: uidStr, referralRewarded: true });
       const totalEarned = rewardedInvited * REFERRAL_BONUS;
-      const safeBotUser = BOT_USERNAME.replace(/_/g, '\\_');
-      const inviteLink = `https://t.me/${safeBotUser}?start=${uidStr}`;
-      await sendTgMessage(
-        chatId,
-        `🤝 *ጓደኞችዎን ይጋብዙና ቦነስ ያግኙ!*\n\n` +
-        `የጋበዙት ሰው ተመዝግቦ ቢያንስ *${MIN_DEPOSIT_FOR_BONUS} ብር* ሲያስገባ የ *${REFERRAL_BONUS} ብር* ቦነስ ወዲያውኑ ወደ ሒሳብዎ ይገባል!\n\n` +
-        `📊 *የእርስዎ የሪፈራል ሪፖርት፦*\n` +
-        `👥 የተጋበዙ ሰዎች: *${totalInvited}*\n` +
-        `✅ ቦነስ ያስገኙ: *${rewardedInvited}*\n` +
-        `💰 ጠቅላላ ያገኙት ቦነስ: *${totalEarned} ብር*\n\n` +
-        `🔗 የእርስዎ መጋበዣ ሊንክ:\n${inviteLink}`,
-        mainKeyboard
-      );
+      const safeBotUser = 
+             const inviteLink = `https://t.me{BOT_USERNAME}?start=${uidStr}`;
+        const shareText = encodeURIComponent('ኑ አብረን Edil Bingo እንጫወትና ቦነስ እናግኝ!');
+        const shareUrl = `https://t.me{encodeURIComponent(inviteLink)}&text=${shareText}`;
+
+        await sendTgMessage(
+          chatId,
+          `🤝 *ጓደኞችዎን ይጋብዙና ቦነስ ያግኙ!*\n\n` +
+          `የጋበዙት ሰው ተመዝግቦ ቢያንስ *${MIN_DEPOSIT_FOR_BONUS} ብር* ሲያስገባ የ *${REFERRAL_BONUS} ብር* ቦነስ ወዲያውኑ ወደ ሒሳብዎ ይገባል!\n\n` +
+          `📊 *የእርስዎ የሪፈራል ሪፖርት:-*\n` +
+          `👥 የተጋበዙ ሰዎች: *${totalInvited}*\n` +
+          `✅ ቦነስ ያስገኙ: *${rewardedInvited}*\n` +
+          `💰 ጠቅላላ ያገኙት ቦነስ: *${totalEarned} ብር*\n\n` +
+          `🔗 የእርስዎ መጋበዣ ሊንክ:\n\`${inviteLink}\``,
+          {
+            inline_keyboard: [
+              [{ text: '📤 ለጓደኞች ላክ (Share)', url: shareUrl }]
+            ]
+          }
+        );
+ 
   
 
   
