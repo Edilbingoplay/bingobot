@@ -687,7 +687,7 @@ app.post('/webhook', async (req, res) => {
       const rewardedInvited = await Wallet.countDocuments({ referredBy: uidStr, referralRewarded: true });
       const totalEarned = rewardedInvited * REFERRAL_BONUS;
       const safeBotUser = 
-             const inviteLink = `https://t.me{BOT_USERNAME}?start=${uidStr}`;
+             const inviteLink = `https://t.me{BOT_USERNAME}?start=/${uidStr}`;
         const shareText = encodeURIComponent('ኑ አብረን Edil Bingo እንጫወትና ቦነስ እናግኝ!');
         const shareUrl = `https://t.me{encodeURIComponent(inviteLink)}&text=${shareText}`;
 
