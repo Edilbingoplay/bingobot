@@ -732,8 +732,9 @@ app.post('/webhook', async (req, res) => {
       );
     }
   } else if (state === 'WAITING_DEPOSIT') {
-    const numMatch = text.match(/\d+/);
-    const amt = numMatch ? Number(numMatch.at(0)) : 0;
+            const numMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:ብር|ETB|Birr)/i) || text.match(/\b\d+\.\d{2}\b/) || text.match(/\b\d{2,3}\b/);
+        const amt = numMatch ? Math.floor(Number(numMatch[1] || numMatch[0])) : 0;
+
     if (amt > 0 && (amt < 50 || amt > 500)) {
       await sendTgMessage(chatId, '⚠️ በአንድ ጊዜ ማስገባት የሚቻለው *ዝቅተኛ 50 ብር* እና *ከፍተኛ 500 ብር* ብቻ ነው! እባክዎ ትክክለኛ መጠን ይላኩ።');
       return res.sendStatus(200);
