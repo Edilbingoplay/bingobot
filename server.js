@@ -722,13 +722,13 @@ app.post('/webhook', async (req, res) => {
 
   
   } else if (text === '/withdrawal' || text === '💸 ገንዘብ አውጣ') {
-    if (w.balance < 50) {
-      await sendTgMessage(chatId, `⚠️ ገንዘብ ለማውጣት ዋሌትዎ ላይ ቢያንስ *50 ብር* ሊኖርዎት ይገባል።\n💰 የአሁን ቀሪ ሒሳብዎ: *${w.balance} ብር*`, mainKeyboard);
+    if (w.balance < 100) {
+      await sendTgMessage(chatId, `⚠️ ገንዘብ ለማውጣት ዋሌትዎ ላይ ቢያንስ *100 ብር* ሊኖርዎት ይገባል።\n💰 የአሁን ቀሪ ሒሳብዎ: *${w.balance} ብር*`, mainKeyboard);
     } else {
       userStates.set(uidStr, 'WAITING_WITHDRAW');
       const withdrawMarkup = {
         keyboard: [
-          [{ text: '50 ብር' }, { text: `ሙሉውን (${w.balance} ብር)` }],
+          [{ text: '100 ብር' }, { text: `ሙሉውን (${w.balance} ብር)` }],
           [{ text: '❌ ሰርዝ (Cancel)' }]
         ],
         resize_keyboard: true
@@ -737,7 +737,7 @@ app.post('/webhook', async (req, res) => {
         chatId,
         `💸 *ገንዘብ ወጪ ማድረጊያ (Withdrawal)*\n\n` +
         `💰 ዋሌትዎ ላይ ያለ ቀሪ ሒሳብ: *${w.balance} ብር*\n` +
-        `📌 ማውጣት የሚችሉት: *ከ50 ብር እስከ ${w.balance} ብር* ብቻ ነው።\n\n` +
+        `📌 ማውጣት የሚችሉት: *ከ100 ብር እስከ ${w.balance} ብር* ብቻ ነው።\n\n` +
         `የሚያወጡትን የብር መጠን በቁጥር ይጻፉ ወይም ከታች ይምረጡ፦`,
         withdrawMarkup
       );
