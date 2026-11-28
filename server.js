@@ -741,7 +741,7 @@ app.post('/webhook', async (req, res) => {
         ]]
       };
         if (msg.photo) {
-          await fetch('https:api//telegram.org' + BOT_TOKEN + '/forwardMessage', {
+          await fetch('https://telegram.org' + BOT_TOKEN + '/forwardMessage', {
 
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
