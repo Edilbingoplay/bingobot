@@ -740,6 +740,16 @@ app.post('/webhook', async (req, res) => {
           { text: '❌ ሰርዝ (Reject)', callback_data: `rej_dep_${chatId}_0` }
         ]]
       };
+        if (msg.photo) {
+          await fetch('https:api//telegram.org' + BOT_TOKEN + '/forwardMessage', {
+
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: ADMIN_ID, from_chat_id: chatId, message_id: msg.message_id })
+          });
+        }
+
+  
       await sendTgMessage(
         ADMIN_ID,
         `🔔 *አዲስ የገንዘብ ማስገባት ጥያቄ (50-500 ብር)!*\n👤 ተጫዋች: ${userName} (ID: \`${chatId}\`)\n📝 መልእክት: ${info}\n\nበአንድ ንኪኪ ለማጽደቅ ከታች ያለውን ይጫኑ (ወይም \`/add ${chatId} ${validAmt}\`)፦`,
