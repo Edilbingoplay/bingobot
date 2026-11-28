@@ -692,9 +692,13 @@ app.post('/webhook', async (req, res) => {
       const totalInvited = await Wallet.countDocuments({ referredBy: uidStr });
       const rewardedInvited = await Wallet.countDocuments({ referredBy: uidStr, referralRewarded: true });
       const totalEarned = rewardedInvited * REFERRAL_BONUS;
-          const inviteLink = `https://t.me{BOT_USERNAME}?start=${uidStr}`;
+         const cleanBotUser = (BOT_USERNAME || '').replace('@', '').trim();
+        const inviteLink = 'https://t.me' + cleanBotUser + '?start=' + uidStr;
         const shareText = encodeURIComponent('ኑ አብረን Edil Bingo እንጫወትና ቦነስ እናግኝ!');
-        const shareUrl = `https://t.me{encodeURIComponent(inviteLink)}&text=${shareText}`;
+        const shareUrl = 'https://t.meshare/url?url=' + encodeURIComponent(inviteLink) + '&text=' + shareText;
+ 
+
+
 
 
         await sendTgMessage(
