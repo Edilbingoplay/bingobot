@@ -122,10 +122,7 @@ function checkBotWin(grid, calledSet) {
 }
 
 async function startCentralGame() {
-  if (room.lockedCartelas.size === 0) {
-    room.timer = 25;
-    return;
-  }
+  
 
   let validPot = 0;
   const userCounts = new Map();
@@ -148,11 +145,7 @@ async function startCentralGame() {
     }
   }
 
-  const realCount = Array.from(room.lockedCartelas.values()).filter(v => !String(v.userId).startsWith('bot_')).length;
-  if (realCount === 0) {
-    resetRoomToLobby();
-    return;
-  }
+  
 
   const shuffledNames = [...BOT_NAMES].sort(() => Math.random() - 0.5);
         let nameIdx = 0;
