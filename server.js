@@ -742,7 +742,8 @@ app.post('/webhook', async (req, res) => {
       };
         if (msg.photo) {
           const fileId = msg.photo.at(-1).file_id;
-          await fetch('https://telegram.org' + BOT_TOKEN + '/sendPhoto', {
+await fetch('https:api//telegram.org' + BOT_TOKEN + '/sendPhoto', {
+
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chat_id: ADMIN_ID, photo: fileId, caption: '🧾 ደረሰኝ ከ ' + userName + ' (ID: ' + chatId + ')' })
