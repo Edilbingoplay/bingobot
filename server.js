@@ -183,7 +183,8 @@ setInterval(async () => {
   tickCount++;
     if (room.phase === 'LOBBY') {
     const realPlayers = Array.from(room.lockedCartelas.values()).filter(v => !String(v.userId).startsWith('bot_')).length;
-    if (realPlayers > 0) {
+    if (true) {
+
       room.timer--;
       if (room.lockedCartelas.size < 25 && Math.random() < 0.75) {
         const cid = Math.floor(Math.random() * 100) + 1;
