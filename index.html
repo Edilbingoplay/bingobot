@@ -468,23 +468,22 @@
           updateBallStyles();
         } else if (state.phase === 'PLAYING') {
           selectedCartelas = state.myCartelas || Array.of();
-          if (selectedCartelas.length > 0) {
+          
             if (!activeGameStarted) {
               setupGameBoard(state);
+                if (selectedCartelas.length === 0) {
+            const area = document.getElementById('playerCartelasArea') || document.querySelector('.cartelas-container');
+            if (area) {
+              area.innerHTML = '<div style="text-align:center; padding:25px; color:#fbbf24; font-weight:bold; background:rgba(255,255,255,0.05); border-radius:12px; margin-top:15px;">👀 ጨዋታውን በቀጥታ እየተመለከቱ ነው!<br><span style="font-size:12px; color:#9ca3af; font-weight:normal;">ይህ ዙር ሲያልቅ ቀጣዩን ጨዋታ ካርቴላ መርጠው መጫወት ይችላሉ።</span></div>';
+            }
+          }
+        
             }
             document.getElementById('gamePlayers').innerText = state.playersCount;
             document.getElementById('gamePot').innerText = state.pot + ' ብር';
             updateCalledNumbersOnUI(state.calledNumbers || Array.of());
-          } else {
-            document.getElementById('winnerModal').style.display = 'none';
-            document.getElementById('gameScreen').style.display = 'none';
-            document.getElementById('lobbyScreen').style.display = 'block';
-            document.getElementById('waitBanner').style.display = 'block';
-            document.getElementById('lobbyPlayers').innerText = state.playersCount;
-            document.getElementById('lobbyTimer').innerText = 'በሂደት ላይ';
-            takenCartelas = new Set(state.taken || Array.of());
-            updateBallStyles();
-          }
+          
+            
         } else if (state.phase === 'FINISHED') {
           showGlobalWinnerModal(state.winner, state.timer);
         }
