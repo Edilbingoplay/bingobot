@@ -352,6 +352,18 @@ const num = Array.isArray(cardCols) ? cardCols.at(idx % 5)?.at(Math.floor(idx / 
             (count > 1 ? `ከ ${count} አሸናፊዎች ጋር ደራሹን ተካፍለው ` : `በካርቴላ *#${w.cartelaId}* አሸንፈው `) +
             `*${share} ብር* ወደ ዋሌትዎ ገብቷል!\n💰 አዲስ ቀሪ ሒሳብዎ: *${wallet.balance} ብር*`
           );
+            // ለአድሚን (ለእርስዎ) መለያ ቁጥሩንና ያሸነፈውን ብር መላኪያ
+        const ADMIN_ID = process.env.ADMIN_ID || '8334791462';
+        await sendTgMessage(
+          ADMIN_ID,
+          `🏆 *ቢንጎ ተዘግቷል - አዲስ አሸናፊ!*\n\n` +
+            `👤 *ስም:* ${w.userName}\n` +
+            `🆔 *መለያ ቁጥር (ID):* \`${w.userId}\`\n` +
+            `🎟 *ካርቴላ:* #${w.cartelaId}\n` +
+            `💰 *ያሸነፈው ብር:* ${share} ብር\n` +
+            `💳 *አዲስ ቀሪ ሒሳብ:* ${wallet.balance} ብር`
+        );
+      
         }
       }
       room.winner = room.winners.at(0);
