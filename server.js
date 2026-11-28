@@ -740,14 +740,26 @@ app.post('/webhook', async (req, res) => {
           { text: '❌ ሰርዝ (Reject)', callback_data: `rej_dep_${chatId}_0` }
         ]]
       };
-        if (msg.photo) {
-          await fetch('https://telegram.org' + BOT_TOKEN + '/forwardMessage', {
+  if (msg.photo) {
+  try {
+    const fwdRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/forwardMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: ADMIN_ID,
+        from_chat_id: chatId,
+        message_id: msg.message_id
+      })
+    });
+    const fwdData = await fwdRes.json();
+    if (!fwdData.ok) {
+      console.error('forwardMessage failed:', fwdData);
+    }
+  } catch (err) {
+    console.error('forwardMessage error:', err);
+  }
+}
 
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: ADMIN_ID, from_chat_id: chatId, message_id: msg.message_id })
-          });
-        }
 
   
       await sendTgMessage(
