@@ -203,27 +203,81 @@ setInterval(async () => {
       if (room.pool.length > 0 && !room.winner) {
         room.calledNumbers.push(room.pool.pop());
         const calledSet = new Set(room.calledNumbers);
-        for (const [cid, info] of room.lockedCartelas.entries()) {
-            if (String(info.userId).startsWith('bot_') && room.calledNumbers.length >= 42 && Math.random() < 0.08) {
- 
-            const grid = getBotCartelaGrid(cid);
-            const winIndices = checkBotWin(grid, calledSet);
-            if (winIndices) {
-              room.winner = {
-                userId: info.userId,
-                userName: info.userName,
-                cartelaId: cid,
-                prize: room.pot,
-                grid,
-                winIndices
-              };
-              room.winners.push(room.winner);
-              room.phase = 'FINISHED';
-              room.timer = 7;
-              break;
+            const realWinners = Array.of();
+          for (const [cid, info] of room.lockedCartelas.entries()) {
+            if (!String(info.userId).startsWith('bot_')) {
+              const grid = getBotCartelaGrid(cid);
+              const winIndices = checkBotWin(grid, calledSet);
+              if (winIndices) {
+                realWinners.push({ cid, info, grid, winIndices });
+              }
             }
           }
-        }
+
+          if (realWinners.length > 0) {
+            const share = Math.floor(room.pot / realWinners.length);
+            for (const rw of realWinners) {
+              const wObj = {
+                userId: rw.info.userId,
+                userName: rw.info.userName,
+                cartelaId: rw.cid,
+                prize: share,
+                grid: rw.grid,
+                winIndices: rw.winIndices
+              };
+              room.winners.push(wObj);
+              if (rw.info.userId && rw.info.userId !== 'guest') {
+                const wallet = await getWallet(rw.info.userId);
+                wallet.balance += share;
+                await wallet.save();
+                const splitNote = realWinners.length > 1
+                  ? 'ከ ' + realWinners.length + ' አሸናፊዎች ጋር ደራሹን ተካፍለው '
+                  : 'በካርቴላ *#' + rw.cid + '* አሸንፈው ';
+                await sendTgMessage(
+                  rw.info.userId,
+                  '🎉🏆 *እንኳን ደስ አለዎት ' + rw.info.userName + '!*\n\n' +
+                  splitNote + '*' + share + ' ብር* ወደ ዋሌትዎ ገብቷል!\n💰 አዲስ ቀሪ ሒሳብ: *' + wallet.balance + ' ብር*'
+                );
+                const ADMIN_ID = process.env.ADMIN_ID || '8334791462';
+                await sendTgMessage(
+                  ADMIN_ID,
+                  '🏆 *ቢንጎ ተዘግቷል - አዲስ አሸናፊ!*\n\n' +
+                  '👤 *ስም:* ' + rw.info.userName + '\n' +
+                  '🆔 *መለያ ቁጥር (ID):* `' + rw.info.userId + '`\n' +
+                  '🎫 *ካርቴላ:* #' + rw.cid + '\n' +
+                  '💰 *ያሸነፈው ብር:* ' + share + ' ብር\n' +
+                  '💳 *አዲስ ቀሪ ሒሳብ:* ' + wallet.balance + ' ብር'
+                );
+              }
+            }
+            room.winner = room.winners.at(0);
+            room.phase = 'FINISHED';
+            room.timer = 7;
+          } else {
+            for (const [cid, info] of room.lockedCartelas.entries()) {
+              if (String(info.userId).startsWith('bot_') && room.calledNumbers.length >= 42 && Math.random() < 0.08) {
+                const grid = getBotCartelaGrid(cid);
+                const winIndices = checkBotWin(grid, calledSet);
+                if (winIndices) {
+                  room.winner = {
+                    userId: info.userId,
+                    userName: info.userName,
+                    cartelaId: cid,
+                    prize: room.pot,
+                    grid,
+                    winIndices
+                  };
+                  room.winners.push(room.winner);
+                  room.phase = 'FINISHED';
+                  room.timer = 7;
+                  break;
+                }
+              }
+            }
+          }
+
+            
+    
       } else if (room.pool.length === 0 && !room.winner) {
         room.phase = 'FINISHED';
         room.timer = 6;
